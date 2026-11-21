@@ -4,15 +4,13 @@
 
 ## 安装
 
-落点相同，选一种：
+没有通用路径，取决于你的 agent：DSH 认 `.dsh/skills/` 与 `.agents/skills/`，Claude Code 认 `.claude/skills/`，完全没有 agent 也能当模板库用。
 
 ```powershell
-git clone <repo-url> <项目>\.dsh\skills\project-docs   # 自己跑
+git clone <repo-url> .agents/skills/project-docs
 ```
 
-或者把仓库地址给 agent，让它执行同一条命令。目录名必须是 `project-docs`：`.dsh/skills` 只发现一层，入口是 `project-docs/SKILL.md`。
-
-已安装则更新：`git -C <项目>\.dsh\skills\project-docs pull`。目标项目把 `.dsh/` 写进 `.gitignore`，否则会多一个嵌套仓库。
+跨工具约定是 `.agents/skills/`。其它工具的接法、无 agent 的用法、更新与锁版本见 [接入方式](docs/install.md)。
 
 ## 结构
 
