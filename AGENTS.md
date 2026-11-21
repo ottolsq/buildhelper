@@ -23,6 +23,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root
 - Windows 11 + Windows PowerShell 5.1；没有 `pnpm`，没有 `rg`
 - 执行策略禁止直接运行 `.ps1`：`& script.ps1` 会 UnauthorizedAccess，必须 `-ExecutionPolicy Bypass`
 - `Get-Content` 默认按 ANSI 解码，读 UTF-8 中文会乱码（行数也会数错）；读文件必须带 `-Encoding UTF8`
+- 沙箱内 `git clone <本地路径>` 会失败（msys sh 起不来，`0xC0000022`）；要检查提交内容就用 `git archive` 导出，真实 clone 留给沙箱外的终端（2026-11-21 实测）
 - 项目根：`C:\Users\ottol\myproject\buildhelper`（git 仓库）
 - 仓库根即 skill 根（ADR-004）：`SKILL.md`、`references/`、`scripts/` 直接在根；clone 到 `<项目>\.dsh\skills\project-docs` 即可用，本机尚未安装到任何 agent
 - 文档写入白名单：`README.md`、`CHANGELOG.md`、`AGENTS.md`、`SKILL.md`、`docs/**`、`references/**`、`scripts/**`
