@@ -45,7 +45,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 3. **询问** — 只问三件事：一句话目标、谁用、本期做到哪算完成。
 4. **生成** — 只写缺失项；从 `references/templates/` 复制，替换掉所有 `<!-- fill -->`。
 5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
-6. **自检** — 运行 `scripts/check-docs.ps1 -Root <项目根>`，非 0 退出先修再报告。
+6. **自检** — 运行 `python scripts/check_docs.py -root <项目根>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
 
 ## 探测清单（只读）
@@ -78,19 +78,20 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 校验
 
-`scripts/check-docs.ps1` 检查必填文件、必填章节、相对链接、ADR 编号、残留占位符；退出码非 0 时修完再报告。
+`scripts/check_docs.py` 检查必填文件、必填章节、相对链接、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
-本机禁止直接执行 `.ps1`，必须带 Bypass：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root .
+```text
+python3 scripts/check_docs.py -root <项目根>   # macOS / Linux
+python  scripts/check_docs.py -root <项目根>   # Windows
 ```
 
-脚本保持纯 ASCII：Windows PowerShell 5.1 会把无 BOM 的 `.ps1` 按 ANSI 解析，中文字面量在解析期就报错。章节要求放 `references/checks.json`，要加检查项就改那个文件。
+退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
+
+章节要求放 `references/checks.json`，要加检查项就改那个文件，不改脚本。
 
 ## 资源
 
 - `references/templates/` — 9 份模板，按阶段门取用。模板一律用 `<名字>.template.md` 命名：`AGENTS.md` 在 Windows 上大小写不敏感，`agents.md` 会被当成真指令注入会话
 - `references/checklist.md` — 交付前逐条勾
 - `references/checks.json` — 校验脚本的章节要求，按项目调整
-- `scripts/check-docs.ps1` — 必填文件 / 必填章节 / 相对链接 / ADR 编号
+- `scripts/check_docs.py` — 必填文件 / 必填章节 / 相对链接 / ADR 编号 / 占位符

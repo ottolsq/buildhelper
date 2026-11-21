@@ -3,14 +3,14 @@
 ## 命令
 
 ```powershell
-# 校验文档骨架。本机禁止直接执行 .ps1，必须带 Bypass
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root .
-# 反向用例：空目录（无 README/goal/architecture/AGENTS）应返回非 0 退出码
+# 校验文档骨架。退出码 0 通过 / 1 有 FAIL / 2 用法或配置错误
+python scripts\check_docs.py -root .
+# 反例：空目录（无 README/goal/architecture/AGENTS）应 exit 1；坏 checks.json 应 exit 2
 ```
 
 ## 禁止事项
 
-- 不要在 `.ps1` 里写非 ASCII 字面量。Windows PowerShell 5.1 会把无 BOM 的 `.ps1` 按 ANSI 解析，中文在解析期就报错；中文规则放 `references/checks.json`
+- 不要给校验脚本加第三方依赖，也不要让它打印 traceback：异常一律收敛成一行 `error: ...` 并 exit 2；规则数据放 `references/checks.json`
 - 不要把模板命名为 `AGENTS.md` / `CLAUDE.md`。Windows 大小写不敏感，`agents.md` 会被当成真指令注入会话
 - 不要在 `SKILL.md` 里写具体项目的路径或命令，只写探测顺序
 - 不要一次生成全套文档，不要用 `<!-- fill -->` 占位充当完成
@@ -20,8 +20,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root
 
 ## 环境事实
 
-- Windows 11 + Windows PowerShell 5.1；没有 `pnpm`，没有 `rg`
-- 执行策略禁止直接运行 `.ps1`：`& script.ps1` 会 UnauthorizedAccess，必须 `-ExecutionPolicy Bypass`
+- Windows 11 + PowerShell 5.1；有 `python`（3.15）和 `git`，没有 `pnpm`，没有 `rg`
+- 校验脚本是 Python：`python scripts\check_docs.py -root .`；`.ps1` 已删除，不要再写 `powershell -File`
 - `Get-Content` 默认按 ANSI 解码，读 UTF-8 中文会乱码（行数也会数错）；读文件必须带 `-Encoding UTF8`
 - 沙箱内 `git clone <本地路径>` 会失败（msys sh 起不来，`0xC0000022`）；要检查提交内容就用 `git archive` 导出，真实 clone 留给沙箱外的终端（2026-11-21 实测）
 - 项目根：`C:\Users\ottol\myproject\buildhelper`（git 仓库）
@@ -30,7 +30,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root
 
 ## 完成定义
 
-- 改 `SKILL.md`、模板或 `checks.json` 后，必须跑一次校验脚本，并说明实际输出
+- 改 `SKILL.md`、模板、`checks.json` 或 `check_docs.py` 后，必须跑一次校验并贴实际输出：正常 `0`、空目录 `1`、坏配置 `2`
 - 新增检查项时同时给正例（应 0 FAIL）和反例（应非 0）
 - 文档与实现不一致时先改文档
 

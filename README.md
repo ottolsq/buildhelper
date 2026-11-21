@@ -15,17 +15,18 @@ git clone <repo-url> <你的项目>\.dsh\skills\project-docs
 ```
 SKILL.md                 流程、阶段门、反模式
 references/              checklist、checks.json、9 份模板
-scripts/check-docs.ps1   校验脚本（纯 ASCII）
+scripts/check_docs.py    校验脚本（Python 3.8+，仅标准库）
 docs/                    本项目的目标、架构、计划、ADR
 ```
 
 ## 校验
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-docs.ps1 -Root .
+```
+python  scripts\check_docs.py -root .    # Windows
+python3 scripts/check_docs.py -root .    # macOS / Linux
 ```
 
-退出码 0 才算通过；FAIL 必须修完再报告，WARN 要逐条判断。
+退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误。没有 Python 时按 `references/checklist.md` 人工核对。
 
 ## 文档
 

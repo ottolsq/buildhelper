@@ -11,19 +11,19 @@
 | `SKILL.md` | 流程、阶段门、判定、反模式 | 不放模板正文，不放具体项目路径 |
 | `references/templates/` | 9 份文档骨架 | 不含任何项目内容 |
 | `references/checks.json` | 必填文件与章节的规则数据 | 不含逻辑 |
-| `scripts/check-docs.ps1` | 读规则、扫描、报 FAIL/WARN、给退出码 | 不修文件、不联网 |
+| `scripts/check_docs.py` | 读规则、扫描、报 FAIL/WARN、给退出码 0/1/2 | 不修文件、不联网、不装依赖 |
 
 ## 数据流
 
 ```
-agent 触发 skill → 读 SKILL.md → 按阶段门取模板 → 写入项目 → 跑 check-docs.ps1 → 退出码 0 才报告
+agent 触发 skill → 读 SKILL.md → 按阶段门取模板 → 写入项目 → 跑 check_docs.py → 退出码 0 才报告
 ```
 
 ## 外部依赖
 
 | 依赖 | 用途 | 不可用时 |
 |---|---|---|
-| Windows PowerShell 5.1 | 执行校验脚本 | 手工核对 `checklist.md` |
+| Python 3.8+（仅标准库） | 执行校验脚本 | 按 `references/checklist.md` 人工核对 |
 | 文件系统 | 读写项目文档 | — |
 
 无网络依赖，无包管理器依赖。
@@ -31,7 +31,7 @@ agent 触发 skill → 读 SKILL.md → 按阶段门取模板 → 写入项目 �
 ## 已知边界
 
 - 触发靠模型判断，无法强制；兜底靠 `AGENTS.md` 的约束和校验脚本
-- 只在 Windows + PowerShell 5.1 验证过，其它平台未测
+- 只在 Windows 11 + Python 3.15 实测过；macOS / Linux 跑同一份脚本，未实测
 - 只校验结构（文件、章节、链接、编号），不校验内容是否正确
 - 仓库根即 skill 根，所以校验脚本不能「排除整个包目录」，只能排除 `references/`（按脚本安装路径判断）；否则会把项目本身排除掉
 - 安装到目标项目后，多出的 `docs/`、`README.md` 属噪音，靠 `.dsh` 跳过规则挡住；嵌套 `.git` 需要目标项目把 `.dsh/` 加进 `.gitignore`

@@ -34,7 +34,7 @@
 
 ## 约束
 
-- 必须能在 Windows + Windows PowerShell 5.1 上跑（本机禁止执行 `.ps1`，需 Bypass）
+- 校验脚本跨平台：Windows / macOS / Linux 同一份，只用 Python 3.8+ 标准库，不装依赖
 - 不改 DSH 本体，只做 skill 包
 - 无网络也能用
 
