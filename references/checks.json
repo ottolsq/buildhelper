@@ -1,0 +1,9 @@
+{
+  "placeholderMarker": "<!-- fill",
+  "requiredFiles": {
+    "README.md": ["# "],
+    "docs/goal.md": ["## 目标", "## 非目标", "## 成功标准"],
+    "docs/architecture.md": ["## 组件", "## 数据流"],
+    "AGENTS.md": ["## 命令", "## 禁止事项", "## 完成定义"]
+  }
+}

@@ -1,0 +1,31 @@
+# --- 一次性验证夹具（校验脚本的正反用例）---
+temp/
+
+# --- 系统与编辑器 ---
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# --- 构建 / 依赖 / 缓存产物 ---
+node_modules/
+dist/
+build/
+out/
+bin/
+obj/
+__pycache__/
+*.pyc
+.venv/
+
+# --- 过程与决策记录：只留本地，不随仓库发布 ---
+# 计划、ADR、阶段记录、测试记录记录的是「这个项目怎么从零建起来」，只在本地保留
+docs/plan.md
+docs/adr/
+docs/history/
+docs/test-records.md
+
+# --- 自测安装位：clone 到 .dsh/skills 验证用，不进仓库，避免嵌套仓库 ---
+.dsh/
