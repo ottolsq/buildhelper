@@ -4,29 +4,28 @@
 
 ## 安装
 
+落点相同，选一种：
+
 ```powershell
-git clone <repo-url> <你的项目>\.dsh\skills\project-docs
+git clone <repo-url> <项目>\.dsh\skills\project-docs   # 自己跑
 ```
 
-克隆完即可用：`.dsh/skills` 只发现一层，`project-docs/SKILL.md` 就是入口。目标项目记得把 `.dsh/` 写进 `.gitignore`，否则会多出一个嵌套仓库。
+或者把仓库地址给 agent，让它执行同一条命令。目录名必须是 `project-docs`：`.dsh/skills` 只发现一层，入口是 `project-docs/SKILL.md`。
+
+已安装则更新：`git -C <项目>\.dsh\skills\project-docs pull`。目标项目把 `.dsh/` 写进 `.gitignore`，否则会多一个嵌套仓库。
 
 ## 结构
 
 ```
-SKILL.md                 流程、阶段门、反模式
-references/              checklist、checks.json、9 份模板
-scripts/check_docs.py    校验脚本（Python 3.8+，仅标准库）
-docs/                    本项目的目标、架构、计划、ADR
+SKILL.md                流程、阶段门、反模式
+references/             checks.json、checklist、9 份模板
+scripts/check_docs.py   校验脚本（Python 3.8+，仅标准库）
+docs/                   本项目的目标与架构
 ```
 
 ## 校验
 
-```
-python  scripts\check_docs.py -root .    # Windows
-python3 scripts/check_docs.py -root .    # macOS / Linux
-```
-
-退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误。没有 Python 时按 `references/checklist.md` 人工核对。
+`python scripts\check_docs.py -root .`（macOS/Linux 用 `python3`）。退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误；没有 Python 时按 `references/checklist.md` 人工核对。
 
 ## 文档
 
