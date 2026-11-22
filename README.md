@@ -34,4 +34,4 @@ docs/                   本项目的目标与架构
 
 计划、ADR、阶段记录属于本地过程文档，不随仓库发布（见 `.gitignore`）。
 
-许可：未定。
+许可：MIT（见 [LICENSE](LICENSE)）。
