@@ -4,6 +4,14 @@
 
 ## 未发布
 
+### 新增
+
+- CI 增加一步：运行 `scripts/test_check_docs.py`（stdlib unittest，不引入 pytest）。
+
+### 变更
+
+- 文档以英文为主：`README.md`、`INSTALL.md` 改为英文，中文版移到 `README.zh-CN.md`、`INSTALL.zh-CN.md`。
+
 ### 修复
 
 - 必填章节按 Markdown `#` 标题的层级和名称校验，不再把正文、代码块或注释中的示例当成章节。

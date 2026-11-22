@@ -27,6 +27,10 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # stdlib unittest only: no pytest, no extra dependency.
+      - name: validator unit tests
+        run: python scripts/test_check_docs.py
+
       # Published surface only: the doc set is local by design (ADR-007), so a
       # clone legitimately has no docs/ and must still pass.
       - name: self check passes

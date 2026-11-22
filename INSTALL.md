@@ -1,53 +1,55 @@
-# 接入方式
+# Install
 
-这个仓库本身就是一个 skill 包，但「装到哪」取决于你用哪个 agent——没有一条路径是通用的。下面按从强到弱排。
+English | [简体中文](INSTALL.zh-CN.md)
 
-## 一、支持 SKILL.md 的 agent
+This repository is itself a skill package, but *where* it goes depends on your agent — there is no universal path. Ordered from strongest integration to weakest.
 
-`<name>/SKILL.md` 是通用形态，各工具只是扫描的目录不同：
+## 1. Agents that support SKILL.md
 
-| 工具 | 项目级 | 用户级 |
+`<name>/SKILL.md` is the portable form; tools differ only in which directory they scan:
+
+| Tool | Project-level | User-level |
 |---|---|---|
-| DSH | `.dsh/skills/`、`.agents/skills/` | `~/.dsh/skills/`、`~/.agents/skills/` |
+| DSH | `.dsh/skills/`, `.agents/skills/` | `~/.dsh/skills/`, `~/.agents/skills/` |
 | Claude Code | `.claude/skills/` | `~/.claude/skills/` |
-| Codex CLI / ChatGPT | 见其 skills 设置 | 同上 |
-| 跨工具约定 | `.agents/skills/` | `~/.agents/skills/` |
+| Codex CLI / ChatGPT | see its skills settings | same |
+| Cross-tool convention | `.agents/skills/` | `~/.agents/skills/` |
 
-默认装到跨工具约定的位置，DSH 直接识别，多数工具也能链过去：
+Install into the cross-tool location; DSH picks it up directly and most tools can be linked to it:
 
 ```bash
 git clone <repo-url> .agents/skills/project-docs
 ```
 
-只认自己目录的工具，把它链过去即可（Windows 需要开发者模式或管理员权限）：
+Tools that only read their own directory: link it (on Windows this needs developer mode or admin rights):
 
 ```bash
 ln -s ../../.agents/skills/project-docs .claude/skills/project-docs
 ```
 
-## 二、不支持 skill 的 agent
+## 2. Agents without skill support
 
-不用改目录结构，两种办法：
+No directory change needed; two options:
 
-1. 在项目根的 `AGENTS.md` 或规则文件里加一行指针，让 agent 自己去读：文档流程见 `.agents/skills/project-docs/SKILL.md`。
-2. 直接把 `SKILL.md` 的内容贴进对话。
+1. Add a pointer in the project's `AGENTS.md` or rules file: the doc workflow lives in `.agents/skills/project-docs/SKILL.md`.
+2. Paste the contents of `SKILL.md` into the conversation.
 
-## 三、没有 agent
+## 3. No agent at all
 
-仓库退化成一套模板 + 一份清单，`git clone` 到任意目录都行：
+The repo degrades to templates plus a checklist; `git clone` it anywhere:
 
-- `references/templates/` — 9 份文档模板，复制后填
-- `references/checklist.md` — 交付前逐条勾
-- `scripts/check_docs.py` — 有 Python 3.8+ 就跑，没有就人工核对
+- `references/templates/` — 9 document templates, copy and fill in
+- `references/checklist.md` — tick through it before delivery
+- `scripts/check_docs.py` — run it with Python 3.8+, or review by hand without it
 
-## 更新与锁版本
+## Updating and pinning
 
 ```bash
-git -C <项目>/.agents/skills/project-docs pull   # 更新到最新
-git clone --branch <tag> <repo> ...             # 锁版本（打了 tag 之后才有意义）
+git -C <project>/.agents/skills/project-docs pull   # update to latest
+git clone --branch <tag> <repo> ...                 # pin (meaningful once tags exist)
 ```
 
-## 两个坑
+## Two gotchas
 
-- 目录名必须与 frontmatter 的 `name` 一致（`project-docs`）。同一 skill 根下两个同名目录会撞名，靠 rank 或扫描顺序决定谁生效。
-- 装进项目后把该目录写进 `.gitignore`，否则项目里会多一个嵌套 `.git` 仓库。想让它进版本库，就用 submodule，别直接提交。
+- The directory name must match the frontmatter `name` (`project-docs`). Two same-name bundles under one skill root collide; rank or scan order decides which one wins.
+- Add the directory to the project's `.gitignore`, or the project gains a nested `.git` repository. If it must be versioned, use a submodule — do not commit it directly.
