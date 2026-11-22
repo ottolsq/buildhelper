@@ -23,7 +23,10 @@ docs/                   本项目文档（本地，不发布）
 
 ## 校验
 
-`python scripts\check_docs.py -root . -stage founding`（macOS/Linux 用 `python3`；`-stage` 取 founding / milestone / release，累计）。退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误；没有 Python 时按 `references/checklist.md` 人工核对。
+- 新克隆后校验发布文件：`python scripts/check_docs.py -root . -stage release --published`。
+- 校验含 `docs/` 的本地文档集：`python scripts/check_docs.py -root . -stage founding`。按项目阶段选择 `founding`、`milestone` 或 `release`，要求逐级累加。
+
+macOS/Linux 用 `python3`。退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误。没有 Python 时按 `references/checklist.md` 人工核对。
 
 ## 文档
 

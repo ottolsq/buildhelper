@@ -27,6 +27,10 @@ from pathlib import Path
 SKIP_DIRS = {".git", "node_modules", ".dsh", ".agents", ".venv", "dist", "build", "__pycache__"}
 LINK_RE = re.compile(r"\[[^\]]*\]\(\s*<?([^)>\s]+)")
 INLINE_CODE_RE = re.compile(r"`[^`\r\n]*`")
+FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+COMMENT_START_RE = re.compile(r"^ {0,3}<!--")
+HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
+HEADING_END_RE = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
 ADR_NAME_RE = re.compile(r"^(\d{3})-")
 SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
 
@@ -103,9 +107,9 @@ def required_files(stages, stage):
 def load_gitignore(root):
     """Read the target's .gitignore into (pattern, dir_only, anchored) rules.
 
-    Only the common forms are supported: comments, blank lines, trailing slash for
-    directories, a leading slash to anchor at the root, and ``*`` / ``?`` globs.
-    Negations (``!pattern``) are skipped, which can only make the scan wider.
+    A leading or internal slash anchors a rule at the root; a trailing slash
+    makes it directory-only. ``*`` and ``?`` match within one path component.
+    Negations (``!pattern``) and recursive ``**`` matching are not supported.
     """
     path = Path(root) / ".gitignore"
     if not path.is_file():
@@ -117,7 +121,7 @@ def load_gitignore(root):
             continue
         dir_only = item.endswith("/")
         item = item.rstrip("/")
-        anchored = item.startswith("/")
+        anchored = "/" in item
         item = item.lstrip("/")
         if item:
             rules.append((item, dir_only, anchored))
@@ -128,16 +132,17 @@ def is_ignored(relative_path, rules):
     if not rules:
         return False
     parts = relative_path.split("/")
-    for depth in range(1, len(parts) + 1):
-        prefix = "/".join(parts[:depth])
-        is_dir = depth < len(parts)
-        name = parts[depth - 1]
-        for pattern, dir_only, anchored in rules:
-            if dir_only and not is_dir:
-                continue
-            candidate = prefix if anchored else name
-            if fnmatch.fnmatchcase(candidate, pattern):
+    for pattern, dir_only, anchored in rules:
+        candidates = parts[:-1] if dir_only else parts
+        if anchored:
+            pattern_parts = pattern.split("/")
+            if len(pattern_parts) <= len(candidates) and all(
+                fnmatch.fnmatchcase(name, part_pattern)
+                for name, part_pattern in zip(candidates, pattern_parts)
+            ):
                 return True
+        elif any(fnmatch.fnmatchcase(name, pattern) for name in candidates):
+            return True
     return False
 
 
@@ -161,6 +166,36 @@ def iter_markdown(root, material_root, ignore_rules):
         yield path
 
 
+def markdown_headings(text):
+    headings = set()
+    active_fence = ""
+    in_comment = False
+    for line in text.splitlines():
+        if in_comment:
+            in_comment = "-->" not in line
+            continue
+
+        fence = FENCE_RE.match(line)
+        if active_fence:
+            if fence and fence[1].startswith(active_fence) and not fence[2].strip(" \t"):
+                active_fence = ""
+            continue
+        if fence and (fence[1].startswith("~") or "`" not in fence[2]):
+            active_fence = fence[1]
+            continue
+        if COMMENT_START_RE.match(line):
+            in_comment = "-->" not in line
+            continue
+
+        heading = HEADING_RE.match(line)
+        if heading:
+            title = HEADING_END_RE.sub("", heading[2]).strip()
+            if title:
+                prefix = heading[1] + " "
+                headings.update((prefix, prefix + title))
+    return headings
+
+
 def check_required(root, files, names, report):
     if not names:
         report.warn("no files required by this stage")
@@ -173,7 +208,8 @@ def check_required(root, files, names, report):
             continue
         text = read_text(path)
         sections = rule.get("sections") or []
-        missing = [section for section in sections if section not in text]
+        headings = markdown_headings(text) if sections else set()
+        missing = [section for section in sections if section not in headings]
         if missing:
             report.fail("missing section in {0}: {1}".format(name, ", ".join(missing)))
         else:
@@ -233,12 +269,14 @@ def check_links(root, material_root, ignore_rules, report):
         report.ok("no published file links into ignored paths")
 
 
-def check_adr(root, report):
+def check_adr(root, ignore_rules, report):
     adr_dir = root / "docs" / "adr"
     if not adr_dir.is_dir():
         return
     seen = {}
     for path in sorted(adr_dir.glob("*.md")):
+        if is_ignored(path.relative_to(root).as_posix(), ignore_rules):
+            continue
         match = ADR_NAME_RE.match(path.name)
         if not match:
             report.warn("adr without number: " + path.name)
@@ -304,7 +342,7 @@ def run(args):
     report = Report()
     check_required(root, files, names, report)
     check_links(root, material_root, ignore_rules, report)
-    check_adr(root, report)
+    check_adr(root, ignore_rules if args.published else (), report)
     check_placeholders(root, material_root, settings, ignore_rules, args.strict, report)
     warn_if_container(root, report)
 
