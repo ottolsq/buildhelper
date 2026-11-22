@@ -45,7 +45,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 3. **询问** — 只问三件事：一句话目标、谁用、本期做到哪算完成。
 4. **生成** — 只写缺失项；从 `references/templates/` 复制，替换掉所有 `<!-- fill -->`。
 5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
-6. **自检** — 运行 `python scripts/check_docs.py -root <项目根>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。
+6. **自检** — 运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
 
 ## 探测清单（只读）
@@ -57,16 +57,18 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 每份文档的最低要求
 
-| 文件 | 必须有 | 目标长度 |
-|---|---|---|
-| `README.md` | 一句话目标、状态、跑起来的命令、文档索引 | ≤ 40 行 |
-| `docs/goal.md` | 问题、用户、目标、非目标、成功标准 | ≤ 1 页 |
-| `docs/architecture.md` | 组件边界、数据流、外部依赖、ADR 索引、已知边界 | ≤ 2 页 |
-| `docs/adr/NNN-*.md` | 背景、决策、备选、后果 | ≤ 1 页 |
-| `docs/plan.md` | 本期目标、粗粒度任务、DoD、风险、验收方式 | ≤ 1 页 |
-| `docs/history/NN-*.md` | 达成情况、未完成及原因、风险、下阶段 | ≤ 1 页 |
-| `docs/test-records.md` | 验收结论、已知缺陷与复现、证据位置 | 追加式 |
-| `AGENTS.md` | 命令、禁止项、环境事实、完成定义 | ≤ 100 行 |
+| 文件 | 必须有什么 |
+|---|---|
+| `README.md` | 一句话目标、状态、跑起来的命令、文档索引 |
+| `docs/goal.md` | 问题、用户、目标、非目标、成功标准 |
+| `docs/architecture.md` | 组件边界、数据流、外部依赖、ADR 索引、已知边界 |
+| `docs/adr/NNN-*.md` | 背景、决策、备选、后果 |
+| `docs/plan.md` | 本期目标、粗粒度任务、DoD、风险、验收方式 |
+| `docs/history/NN-*.md` | 达成情况、未完成及原因、风险、下阶段 |
+| `docs/test-records.md` | 验收结论、已知缺陷与复现、证据位置 |
+| `AGENTS.md` | 命令、禁止项、环境事实、完成定义 |
+
+长度上限不写在这里：`references/checks.json` 的 `maxLines` 是唯一事实源，超限报 WARN 但不阻断。
 
 ## 反模式（禁止）
 
@@ -79,20 +81,22 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 校验
 
-`scripts/check_docs.py` 检查必填文件、必填章节、相对链接、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
+`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
 ```text
-python3 scripts/check_docs.py -root <项目根>   # macOS / Linux
-python  scripts/check_docs.py -root <项目根>   # Windows
+python3 scripts/check_docs.py -root <项目根> -stage founding   # macOS / Linux
+python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 ```
 
-退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
+`-stage` 三档，累计：`founding`（默认，README / goal / architecture / AGENTS）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
 
-章节要求放 `references/checks.json`，要加检查项就改那个文件，不改脚本。
+退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏、阶段名不认识）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
+
+阶段、章节、长度都在 `references/checks.json`，要加检查项就改那个文件，不改脚本。
 
 ## 资源
 
 - `references/templates/` — 9 份模板，按阶段门取用。模板一律用 `<名字>.template.md` 命名：`AGENTS.md` 在 Windows 上大小写不敏感，`agents.md` 会被当成真指令注入会话
 - `references/checklist.md` — 交付前逐条勾
-- `references/checks.json` — 校验脚本的章节要求，按项目调整
+- `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限
 - `scripts/check_docs.py` — 必填文件 / 必填章节 / 相对链接 / ADR 编号 / 占位符

@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Validate a project's documentation set.
 
-Checks required files, required sections, relative links, ADR numbering and
-leftover template placeholders. Rules live in ``references/checks.json`` next
-to this script, so the script itself carries no project knowledge.
+Checks required files, required sections, page-length warnings, relative links,
+ADR numbering and leftover template placeholders. Rules live in
+``references/checks.json`` next to this script, so the script carries no project
+knowledge.
+
+Stages are cumulative: ``milestone`` also requires everything ``founding``
+requires, ``release`` requires all three.
 
 Exit codes
     0  clean (warnings allowed)
@@ -30,7 +34,11 @@ EXIT_FINDINGS = 1
 EXIT_USAGE = 2
 
 
-class Finding:
+class ConfigError(Exception):
+    pass
+
+
+class Report:
     def __init__(self):
         self.failures = 0
         self.warnings = 0
@@ -58,15 +66,37 @@ def read_text(path):
     return data.decode("latin-1", errors="replace")
 
 
-def load_config(path):
+def load_rules(config_path):
     try:
-        return json.loads(read_text(path))
+        settings = json.loads(read_text(config_path))
     except (json.JSONDecodeError, ValueError) as exc:
-        raise ConfigError("invalid JSON in {0}: {1}".format(path, exc))
+        raise ConfigError("invalid JSON in {0}: {1}".format(config_path, exc))
+
+    stages = settings.get("stages")
+    files = settings.get("files")
+    if isinstance(files, dict) and files:
+        return settings, (stages or {"founding": sorted(files)}), files
+
+    legacy = settings.get("requiredFiles")
+    if isinstance(legacy, dict) and legacy:
+        files = {}
+        for name, sections in legacy.items():
+            files[name] = {"sections": sections or [], "maxLines": None}
+        return settings, {"founding": sorted(files)}, files
+
+    raise ConfigError("config has neither 'stages'+'files' nor 'requiredFiles': " + str(config_path))
 
 
-class ConfigError(Exception):
-    pass
+def required_files(stages, stage):
+    order = list(stages)
+    if stage not in stages:
+        raise ConfigError("unknown stage {0!r}; known: {1}".format(stage, ", ".join(order)))
+    names = []
+    for current in order[: order.index(stage) + 1]:
+        for name in stages[current]:
+            if name not in names:
+                names.append(name)
+    return names
 
 
 def iter_markdown(root, material_root):
@@ -83,22 +113,29 @@ def iter_markdown(root, material_root):
         yield path
 
 
-def check_required(root, settings, report):
-    required = settings.get("requiredFiles") or {}
-    if not required:
-        report.warn("checks.json lists no required files")
+def check_required(root, files, names, report):
+    if not names:
+        report.warn("no files required by this stage")
         return
-    for name, sections in required.items():
+    for name in names:
+        rule = files.get(name) or {}
         path = root / name
         if not path.is_file():
             report.fail("missing file: " + name)
             continue
         text = read_text(path)
-        missing = [section for section in (sections or []) if section not in text]
+        sections = rule.get("sections") or []
+        missing = [section for section in sections if section not in text]
         if missing:
             report.fail("missing section in {0}: {1}".format(name, ", ".join(missing)))
         else:
             report.ok("sections: " + name)
+
+        limit = rule.get("maxLines")
+        if isinstance(limit, int) and limit > 0:
+            lines = len(text.splitlines())
+            if lines > limit:
+                report.warn("length {0}/{1} lines in {2}".format(lines, limit, name))
 
 
 def check_links(root, material_root, report):
@@ -178,17 +215,18 @@ def run(args):
     if not config.is_file():
         raise ConfigError("config not found: " + str(config))
 
-    settings = load_config(config)
+    settings, stages, files = load_rules(config)
+    names = required_files(stages, args.stage)
     material_root = Path(__file__).resolve().parent.parent / "references"
 
-    report = Finding()
-    check_required(root, settings, report)
+    report = Report()
+    check_required(root, files, names, report)
     check_links(root, material_root, report)
     check_adr(root, report)
     check_placeholders(root, material_root, settings, args.strict, report)
 
     print("")
-    print("{0} failure(s), {1} warning(s) under {2}".format(report.failures, report.warnings, root))
+    print("{0} failure(s), {1} warning(s) under {2} (stage: {3})".format(report.failures, report.warnings, root, args.stage))
     return EXIT_FINDINGS if report.failures else EXIT_OK
 
 
@@ -196,6 +234,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate a project's documentation set.")
     parser.add_argument("-root", "--root", default=".", help="project root (default: current directory)")
     parser.add_argument("-config", "--config", default=None, help="path to checks.json (default: ../references/checks.json)")
+    parser.add_argument("-stage", "--stage", default="founding", help="founding (default) / milestone / release; stages are cumulative")
     parser.add_argument("-strict", "--strict", action="store_true", help="treat unfilled placeholders as failures")
     args = parser.parse_args(argv)
 

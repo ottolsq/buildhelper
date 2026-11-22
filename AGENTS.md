@@ -4,13 +4,15 @@
 
 ```powershell
 # 校验文档骨架。退出码 0 通过 / 1 有 FAIL / 2 用法或配置错误
-python scripts\check_docs.py -root .
-# 反例：空目录（无 README/goal/architecture/AGENTS）应 exit 1；坏 checks.json 应 exit 2
+python scripts\check_docs.py -root . -stage founding
+# 阶段累计：milestone 加 docs/plan.md，release 加 CHANGELOG.md
+# 反例：空目录 founding 应 exit 1；release 缺 CHANGELOG 应 exit 1；未知阶段应 exit 2
 ```
 
 ## 禁止事项
 
-- 不要给校验脚本加第三方依赖，也不要让它打印 traceback：异常一律收敛成一行 `error: ...` 并 exit 2；规则数据放 `references/checks.json`
+- 不要把规则写回脚本或 `SKILL.md`：阶段、章节、长度只在 `references/checks.json`（ADR-006）
+- 不要给校验脚本加第三方依赖，也不要让它打印 traceback：异常一律收敛成一行 `error: ...` 并 exit 2
 - 不要把模板命名为 `AGENTS.md` / `CLAUDE.md`。Windows 大小写不敏感，`agents.md` 会被当成真指令注入会话
 - 不要在 `SKILL.md` 里写具体项目的路径或命令，只写探测顺序
 - 不要一次生成全套文档，不要用 `<!-- fill -->` 占位充当完成
@@ -30,7 +32,7 @@ python scripts\check_docs.py -root .
 
 ## 完成定义
 
-- 改 `SKILL.md`、模板、`checks.json` 或 `check_docs.py` 后，必须跑一次校验并贴实际输出：正常 `0`、空目录 `1`、坏配置 `2`
+- 改 `SKILL.md`、模板、`checks.json` 或 `check_docs.py` 后，必须跑三档 `-stage` 并贴实际输出：正常 `0`、空目录 `1`、坏配置或未知阶段 `2`
 - 新增检查项时同时给正例（应 0 FAIL）和反例（应非 0）
 - 文档与实现不一致时先改文档
 

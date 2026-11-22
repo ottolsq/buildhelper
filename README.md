@@ -23,7 +23,7 @@ docs/                   本项目的目标与架构
 
 ## 校验
 
-`python scripts\check_docs.py -root .`（macOS/Linux 用 `python3`）。退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误；没有 Python 时按 `references/checklist.md` 人工核对。
+`python scripts\check_docs.py -root . -stage founding`（macOS/Linux 用 `python3`；`-stage` 取 founding / milestone / release，累计）。退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误；没有 Python 时按 `references/checklist.md` 人工核对。
 
 ## 文档
 
