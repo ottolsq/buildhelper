@@ -53,6 +53,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 - 清单文件：`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml`、`*.csproj`
 - 命令来源：清单里的 `scripts`、`Makefile`、`justfile`、CI 配置
 - 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`
+- 写入边界：先看目标项目的 `.gitignore`。它可能已经忽略 `docs/` 或 `AGENTS.md`，那本次产物不会入库，必须在报告里点明（2026-11-22 ctrip 实测：`docs/` 被忽略，只有根级 `AGENTS.md` 可提交）
 - 事实来源：所有命令从上述文件抄，不凭印象写；查不到就标「未验证」
 
 ## 每份文档的最低要求
@@ -78,6 +79,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 - 把命令手抄进 README 而不指向真实脚本名
 - 用自己编的目标替代用户确认，或把「待定」当成已完成
 - 不要链接此刻不存在的文件：阶段文档等它产生后再加索引（2026-11-22 dogfooding 暴露，模板索引会让立项即断链）
+- 存量项目不要为了通过长度检查去压缩 README：先补缺失文档，超长记为已知（2026-11-22 ctrip：168 行 vs 上限 40，压缩等于重写）
 
 ## 校验
 
