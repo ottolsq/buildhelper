@@ -186,6 +186,22 @@ def check_required(root, files, names, report):
                 report.warn("length {0}/{1} lines in {2}".format(lines, limit, name))
 
 
+def warn_if_container(root, report):
+    """A directory without a README but with nested repositories is a workspace, not a project."""
+    if (root / "README.md").is_file():
+        return
+    try:
+        nested = sorted(p.name for p in root.iterdir() if p.is_dir() and (p / ".git").exists())
+    except OSError:
+        return
+    if nested:
+        report.warn(
+            "looks like a workspace container, not a project: {0} nested repo(s) here ({1}); rerun with -root pointing at one of them".format(
+                len(nested), ", ".join(nested)
+            )
+        )
+
+
 def check_links(root, material_root, ignore_rules, report):
     broken = 0
     unpublished = 0
@@ -285,6 +301,7 @@ def run(args):
     check_links(root, material_root, ignore_rules, report)
     check_adr(root, report)
     check_placeholders(root, material_root, settings, ignore_rules, args.strict, report)
+    warn_if_container(root, report)
 
     print("")
     print("{0} failure(s), {1} warning(s) under {2} (stage: {3})".format(report.failures, report.warnings, root, args.stage))

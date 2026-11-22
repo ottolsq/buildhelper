@@ -50,6 +50,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 探测清单（只读）
 
+- **是不是一个项目**：根目录有 `README` 或清单文件 → 是项目；根目录没有 `README` 但有子目录自带 `.git` → 是容器工作区，让用户挑一个子项目，不要给容器根写文档；纯笔记、归档、下载目录不接入，除非用户明确要求（2026-11-22 studyAI 实测：容器根上校验只会得到 4 个无意义的 FAIL）
 - 清单文件：`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml`、`*.csproj`
 - 命令来源：清单里的 `scripts`、`Makefile`、`justfile`、CI 配置
 - 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`
