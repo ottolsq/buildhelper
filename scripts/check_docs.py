@@ -188,6 +188,7 @@ def check_required(root, files, names, report):
 
 def check_links(root, material_root, ignore_rules, report):
     broken = 0
+    unpublished = 0
     for path in iter_markdown(root, material_root, ignore_rules):
         for target in LINK_RE.findall(read_text(path)):
             target = target.strip()
@@ -198,11 +199,22 @@ def check_links(root, material_root, ignore_rules, report):
             clean = target.split("#", 1)[0].strip("<>")
             if not clean:
                 continue
-            if not (path.parent / clean).exists():
+            candidate = path.parent / clean
+            if not candidate.exists():
                 broken += 1
                 report.warn("broken link in {0}: {1}".format(relative(path, root), target))
+                continue
+            try:
+                target_rel = candidate.resolve().relative_to(root).as_posix()
+            except (ValueError, OSError):
+                continue
+            if is_ignored(target_rel, ignore_rules):
+                unpublished += 1
+                report.warn("published file {0} links to ignored path: {1}".format(relative(path, root), target))
     if broken == 0:
         report.ok("relative links resolve")
+    if unpublished == 0:
+        report.ok("no published file links into ignored paths")
 
 
 def check_adr(root, report):

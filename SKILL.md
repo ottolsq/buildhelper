@@ -83,7 +83,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 校验
 
-`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
+`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
 ```text
 python3 scripts/check_docs.py -root <项目根> -stage founding   # macOS / Linux
