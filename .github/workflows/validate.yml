@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             python: '3.8'
           - os: ubuntu-latest
             python: '3.12'
@@ -27,8 +27,16 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # Published surface only: the doc set is local by design (ADR-007), so a
+      # clone legitimately has no docs/ and must still pass.
       - name: self check passes
-        run: python scripts/check_docs.py -root . -stage release
+        run: python scripts/check_docs.py -root . -stage release --published
+
+      # Guard the boundary itself: without --published the same tree must fail,
+      # and it must fail on the local-only docs, not on something else.
+      - name: local-only docs are absent from a clone
+        run: |
+          python -c "import subprocess, sys; r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', '.', '-stage', 'release'], capture_output=True); out = r.stdout.decode('utf-8', 'replace'); ok = r.returncode == 1 and 'docs/goal.md' in out and 'docs/plan.md' in out; print(out); sys.exit(0 if ok else 1)"
 
       - name: missing docs exits 1
         run: |
@@ -40,7 +48,7 @@ jobs:
 
       - name: gbk documents still match
         run: |
-          python -c "import pathlib, subprocess, sys, tempfile; d = pathlib.Path(tempfile.mkdtemp()); (d / 'docs').mkdir(); enc = 'gb18030'; (d / 'README.md').write_text('# t\n', encoding=enc); (d / 'docs' / 'goal.md').write_text('## 目标\n## 非目标\n## 成功标准\n', encoding=enc); (d / 'docs' / 'architecture.md').write_text('## 组件\n## 数据流\n', encoding=enc); (d / 'AGENTS.md').write_text('## 命令\n## 禁止事项\n## 完成定义\n', encoding=enc); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', str(d), '-stage', 'founding']); sys.exit(0 if r.returncode == 0 else 1)"
+          python -c "import pathlib, subprocess, sys, tempfile; d = pathlib.Path(tempfile.mkdtemp()); (d / 'docs').mkdir(); enc = 'gb18030'; (d / 'README.md').write_text('# t\n', encoding=enc); (d / 'docs' / 'goal.md').write_text('## 目标\n## 非目标\n## 成功标准\n', encoding=enc); (d / 'docs' / 'architecture.md').write_text('## 组件\n## 数据流\n', encoding=enc); (d / 'AGENTS.md').write_text('## 命令\n## 禁止事项\n## 完成定义\n', encoding=enc); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', str(d), '-stage', 'founding'], capture_output=True); print(r.stdout.decode('utf-8', 'replace')); sys.exit(0 if r.returncode == 0 else 1)"
 
       - name: gitignored paths are not scanned
         run: |

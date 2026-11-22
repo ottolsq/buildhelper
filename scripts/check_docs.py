@@ -295,6 +295,11 @@ def run(args):
     names = required_files(stages, args.stage)
     material_root = Path(__file__).resolve().parent.parent / "references"
     ignore_rules = load_gitignore(root)
+    if args.published:
+        skipped = [name for name in names if is_ignored(name, ignore_rules)]
+        names = [name for name in names if not is_ignored(name, ignore_rules)]
+        if skipped:
+            print("skip  local-only (not published): " + ", ".join(skipped))
 
     report = Report()
     check_required(root, files, names, report)
@@ -304,7 +309,8 @@ def run(args):
     warn_if_container(root, report)
 
     print("")
-    print("{0} failure(s), {1} warning(s) under {2} (stage: {3})".format(report.failures, report.warnings, root, args.stage))
+    suffix = ", published only" if args.published else ""
+    print("{0} failure(s), {1} warning(s) under {2} (stage: {3}{4})".format(report.failures, report.warnings, root, args.stage, suffix))
     return EXIT_FINDINGS if report.failures else EXIT_OK
 
 
@@ -313,6 +319,7 @@ def main(argv=None):
     parser.add_argument("-root", "--root", default=".", help="project root (default: current directory)")
     parser.add_argument("-config", "--config", default=None, help="path to checks.json (default: ../references/checks.json)")
     parser.add_argument("-stage", "--stage", default="founding", help="founding (default) / milestone / release; stages are cumulative")
+    parser.add_argument("-published", "--published", action="store_true", help="check only files that a clone would receive (skips gitignored ones)")
     parser.add_argument("-strict", "--strict", action="store_true", help="treat unfilled placeholders as failures")
     args = parser.parse_args(argv)
 

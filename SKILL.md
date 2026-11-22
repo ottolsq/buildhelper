@@ -93,6 +93,8 @@ python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 
 `-stage` 三档，累计：`founding`（默认，README / goal / architecture / AGENTS）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
 
+加 `--published` 只校验发布物：被 `.gitignore` 忽略的文件从必填清单里剔除。克隆下来的仓库没有本地的 `docs/`，CI 和「验收入库内容」都用这个模式；本地全量校验不加它。
+
 退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏、阶段名不认识）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。扫描会跳过目标项目 `.gitignore` 里忽略的路径（不支持 `!` 取反），否则本地归档目录会给断链检查刷出大量噪音。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
 
 阶段、章节、长度都在 `references/checks.json`，要加检查项就改那个文件，不改脚本。

@@ -8,6 +8,7 @@
 
 - 发布边界检查：已发布的文件如果链接到被 `.gitignore` 忽略的路径，报 WARN（ADR-007）
 - 容器工作区提示：根目录没有 `README` 但子目录自带 `.git` 时，提示改为对子项目跑 `-root`
+- `--published`：只校验发布物，把 `.gitignore` 忽略的文件从必填清单里剔除（克隆里没有 `docs/`）
 - CI：ubuntu（3.8 / 3.12）、windows、macos 四组合跑正反用例
 
 ### 变更
