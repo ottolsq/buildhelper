@@ -42,6 +42,10 @@ jobs:
         run: |
           python -c "import pathlib, subprocess, sys, tempfile; d = pathlib.Path(tempfile.mkdtemp()); (d / 'docs').mkdir(); enc = 'gb18030'; (d / 'README.md').write_text('# t\n', encoding=enc); (d / 'docs' / 'goal.md').write_text('## 目标\n## 非目标\n## 成功标准\n', encoding=enc); (d / 'docs' / 'architecture.md').write_text('## 组件\n## 数据流\n', encoding=enc); (d / 'AGENTS.md').write_text('## 命令\n## 禁止事项\n## 完成定义\n', encoding=enc); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', str(d), '-stage', 'founding']); sys.exit(0 if r.returncode == 0 else 1)"
 
+      - name: gitignored paths are not scanned
+        run: |
+          python -c "import pathlib, subprocess, sys, tempfile; d = pathlib.Path(tempfile.mkdtemp()); enc = 'utf-8'; (d / 'docs').mkdir(); (d / 'README.md').write_text('# t\n', encoding=enc); (d / 'docs' / 'goal.md').write_text('## 目标\n## 非目标\n## 成功标准\n', encoding=enc); (d / 'docs' / 'architecture.md').write_text('## 组件\n## 数据流\n', encoding=enc); (d / 'AGENTS.md').write_text('## 命令\n## 禁止事项\n## 完成定义\n', encoding=enc); (d / '.gitignore').write_text('local/\n', encoding=enc); (d / 'local').mkdir(); (d / 'local' / 'broken.md').write_text('[x](missing.md)\n', encoding=enc); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', str(d), '-stage', 'founding'], capture_output=True); out = r.stdout.decode('utf-8', 'replace'); ok = r.returncode == 0 and 'broken link' not in out; print(out); sys.exit(0 if ok else 1)"
+
       - name: frontmatter is valid
         run: |
           python -c "import pathlib, sys; t = pathlib.Path('SKILL.md').read_text(encoding='utf-8'); fm = t.split('---')[1]; ok = 'name: project-docs' in fm and 'description:' in fm; print('frontmatter ok' if ok else 'frontmatter broken'); sys.exit(0 if ok else 1)"

@@ -18,6 +18,7 @@ Runs on Windows, macOS and Linux with the Python 3.8+ standard library only.
 """
 
 import argparse
+import fnmatch
 import json
 import re
 import sys
@@ -99,11 +100,58 @@ def required_files(stages, stage):
     return names
 
 
-def iter_markdown(root, material_root):
+def load_gitignore(root):
+    """Read the target's .gitignore into (pattern, dir_only, anchored) rules.
+
+    Only the common forms are supported: comments, blank lines, trailing slash for
+    directories, a leading slash to anchor at the root, and ``*`` / ``?`` globs.
+    Negations (``!pattern``) are skipped, which can only make the scan wider.
+    """
+    path = Path(root) / ".gitignore"
+    if not path.is_file():
+        return []
+    rules = []
+    for line in read_text(path).splitlines():
+        item = line.strip()
+        if not item or item.startswith("#") or item.startswith("!"):
+            continue
+        dir_only = item.endswith("/")
+        item = item.rstrip("/")
+        anchored = item.startswith("/")
+        item = item.lstrip("/")
+        if item:
+            rules.append((item, dir_only, anchored))
+    return rules
+
+
+def is_ignored(relative_path, rules):
+    if not rules:
+        return False
+    parts = relative_path.split("/")
+    for depth in range(1, len(parts) + 1):
+        prefix = "/".join(parts[:depth])
+        is_dir = depth < len(parts)
+        name = parts[depth - 1]
+        for pattern, dir_only, anchored in rules:
+            if dir_only and not is_dir:
+                continue
+            candidate = prefix if anchored else name
+            if fnmatch.fnmatchcase(candidate, pattern):
+                return True
+    return False
+
+
+def iter_markdown(root, material_root, ignore_rules):
     for path in sorted(root.rglob("*.md")):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
+        try:
+            rel = path.relative_to(root)
+        except ValueError:
+            continue
+        if any(part in SKIP_DIRS for part in rel.parts):
+            continue
+        if is_ignored(rel.as_posix(), ignore_rules):
             continue
         try:
             if material_root is not None and material_root in path.resolve().parents:
@@ -138,9 +186,9 @@ def check_required(root, files, names, report):
                 report.warn("length {0}/{1} lines in {2}".format(lines, limit, name))
 
 
-def check_links(root, material_root, report):
+def check_links(root, material_root, ignore_rules, report):
     broken = 0
-    for path in iter_markdown(root, material_root):
+    for path in iter_markdown(root, material_root, ignore_rules):
         for target in LINK_RE.findall(read_text(path)):
             target = target.strip()
             if not target or SCHEME_RE.match(target):
@@ -181,10 +229,10 @@ def check_adr(root, report):
         report.ok("adr numbering contiguous: {0} file(s)".format(len(seen)))
 
 
-def check_placeholders(root, material_root, settings, strict, report):
+def check_placeholders(root, material_root, settings, ignore_rules, strict, report):
     marker = settings.get("placeholderMarker") or "<!-- fill"
     hits = 0
-    for path in iter_markdown(root, material_root):
+    for path in iter_markdown(root, material_root, ignore_rules):
         body = INLINE_CODE_RE.sub("", read_text(path))
         count = body.count(marker)
         if count <= 0:
@@ -218,12 +266,13 @@ def run(args):
     settings, stages, files = load_rules(config)
     names = required_files(stages, args.stage)
     material_root = Path(__file__).resolve().parent.parent / "references"
+    ignore_rules = load_gitignore(root)
 
     report = Report()
     check_required(root, files, names, report)
-    check_links(root, material_root, report)
+    check_links(root, material_root, ignore_rules, report)
     check_adr(root, report)
-    check_placeholders(root, material_root, settings, args.strict, report)
+    check_placeholders(root, material_root, settings, ignore_rules, args.strict, report)
 
     print("")
     print("{0} failure(s), {1} warning(s) under {2} (stage: {3})".format(report.failures, report.warnings, root, args.stage))
