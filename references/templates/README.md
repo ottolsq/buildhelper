@@ -9,6 +9,7 @@
 ## 快速开始
 
 <!-- fill: 三条以内命令，必须能在干净环境复现。命令从清单文件的 scripts 抄，不要另造 -->
+<!-- 立项阶段还没有可跑命令时，写「尚未实现」+ 计划中的命令并注明待校准；不要编造，也不要留空 -->
 <!-- 例：
 ```sh
 pnpm install
@@ -24,9 +25,9 @@ pnpm start --help
 | [目标与范围](docs/goal.md) | 为什么做、不做什么 |
 | [技术架构](docs/architecture.md) | 组件边界与关键决策 |
 | [项目计划](docs/plan.md) | 本期目标与完成定义 |
-| [阶段记录](docs/history/) | 每阶段结论与风险 |
-| [测试记录](docs/test-records.md) | 验收结论与已知缺陷 |
-| [变更日志](CHANGELOG.md) | 版本变化 |
+
+<!-- 后续阶段的文档等它真的产生后再加索引行，不要提前写链接：
+     docs/history/、docs/test-records.md、CHANGELOG.md -->
 
 ## 开发约定
 
