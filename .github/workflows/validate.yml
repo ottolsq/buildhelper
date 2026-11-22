@@ -1,0 +1,47 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.8'
+          - os: ubuntu-latest
+            python: '3.12'
+          - os: windows-latest
+            python: '3.12'
+          - os: macos-latest
+            python: '3.12'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: self check passes
+        run: python scripts/check_docs.py -root . -stage release
+
+      - name: missing docs exits 1
+        run: |
+          python -c "import subprocess, sys, tempfile; d = tempfile.mkdtemp(); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', d], capture_output=True); sys.exit(0 if r.returncode == 1 else 1)"
+
+      - name: unknown stage exits 2
+        run: |
+          python -c "import subprocess, sys; r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', '.', '-stage', 'bogus'], capture_output=True); sys.exit(0 if r.returncode == 2 else 1)"
+
+      - name: gbk documents still match
+        run: |
+          python -c "import pathlib, subprocess, sys, tempfile; d = pathlib.Path(tempfile.mkdtemp()); (d / 'docs').mkdir(); enc = 'gb18030'; (d / 'README.md').write_text('# t\n', encoding=enc); (d / 'docs' / 'goal.md').write_text('## 目标\n## 非目标\n## 成功标准\n', encoding=enc); (d / 'docs' / 'architecture.md').write_text('## 组件\n## 数据流\n', encoding=enc); (d / 'AGENTS.md').write_text('## 命令\n## 禁止事项\n## 完成定义\n', encoding=enc); r = subprocess.run([sys.executable, 'scripts/check_docs.py', '-root', str(d), '-stage', 'founding']); sys.exit(0 if r.returncode == 0 else 1)"
+
+      - name: frontmatter is valid
+        run: |
+          python -c "import pathlib, sys; t = pathlib.Path('SKILL.md').read_text(encoding='utf-8'); fm = t.split('---')[1]; ok = 'name: project-docs' in fm and 'description:' in fm; print('frontmatter ok' if ok else 'frontmatter broken'); sys.exit(0 if ok else 1)"
