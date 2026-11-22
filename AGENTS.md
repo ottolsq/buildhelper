@@ -18,7 +18,7 @@ python scripts\check_docs.py -root . -stage founding
 - 不要一次生成全套文档，不要用 `<!-- fill -->` 占位充当完成
 - 不要为某次事故单独加一条规则而不注明来源（issue 号或日期）
 - 不要把 skill 物料放回 `skill/` 之类的子目录：DSH 只发现一层 `<根>/<名字>/SKILL.md`，多一层就失去「克隆即用」（ADR-004）
-- 不要提交 `docs/plan.md`、`docs/adr/`、`docs/history/`、`docs/test-records.md`：这些是本地过程记录，`.gitignore` 已挡（2026-11-21 用户要求，不公开构建过程）
+- 不要提交 `docs/` 下任何文件：整个文档集都是本地过程记录，`.gitignore` 已挡（ADR-007）
 
 ## 环境事实
 
@@ -38,7 +38,7 @@ python scripts\check_docs.py -root . -stage founding
 
 ## 文档指针
 
-- 目标与范围：`docs/goal.md`
-- 架构：`docs/architecture.md`
-- 计划与 DoD：`docs/plan.md`（仅本地，不提交）
-- 决策：`docs/adr/`（仅本地，不提交）
+- 目标与范围：`docs/goal.md`（仅本地）
+- 架构：`docs/architecture.md`（仅本地）
+- 计划与 DoD：`docs/plan.md`（仅本地）
+- 决策：`docs/adr/`（仅本地）

@@ -10,7 +10,7 @@
 git clone <repo-url> .agents/skills/project-docs
 ```
 
-跨工具约定是 `.agents/skills/`。其它工具的接法、无 agent 的用法、更新与锁版本见 [接入方式](docs/install.md)。
+跨工具约定是 `.agents/skills/`。其它工具的接法、无 agent 的用法、更新与锁版本见 [接入方式](INSTALL.md)。
 
 ## 结构
 
@@ -18,7 +18,7 @@ git clone <repo-url> .agents/skills/project-docs
 SKILL.md                流程、阶段门、反模式
 references/             checks.json、checklist、9 份模板
 scripts/check_docs.py   校验脚本（Python 3.8+，仅标准库）
-docs/                   本项目的目标与架构
+docs/                   本项目文档（本地，不发布）
 ```
 
 ## 校验
@@ -27,11 +27,6 @@ docs/                   本项目的目标与架构
 
 ## 文档
 
-| 文档 | 内容 |
-|---|---|
-| [目标与范围](docs/goal.md) | 为什么做、不做什么 |
-| [技术架构](docs/architecture.md) | 四层结构与边界 |
-
-计划、ADR、阶段记录属于本地过程文档，不随仓库发布（见 `.gitignore`）。
+文档集（目标、架构、计划、ADR、阶段与测试记录）默认只留本地，不随仓库发布——这是设计，不是缺失（ADR-007）。安装与接入见 [接入方式](INSTALL.md)。
 
 许可：MIT（见 [LICENSE](LICENSE)）。

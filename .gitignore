@@ -20,12 +20,9 @@ __pycache__/
 *.pyc
 .venv/
 
-# --- 过程与决策记录：只留本地，不随仓库发布 ---
-# 计划、ADR、阶段记录、测试记录记录的是「这个项目怎么从零建起来」，只在本地保留
-docs/plan.md
-docs/adr/
-docs/history/
-docs/test-records.md
+# --- 文档集：只留本地，不随仓库发布（ADR-007）---
+# 目标、架构、计划、ADR、阶段与测试记录都描述了构建过程，远端只放必要文件
+docs/
 
 # --- 自测安装位：clone 到 .dsh/skills 验证用，不进仓库，避免嵌套仓库 ---
 .dsh/
