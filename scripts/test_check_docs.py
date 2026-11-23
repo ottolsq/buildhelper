@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -321,6 +322,160 @@ class SecretScanTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("FAIL  possible secret (github-token) at README.md:3", result.stdout)
+
+
+class InventoryTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md", "docs/goal.md", "docs/architecture.md"]},
+            "files": {
+                "README.md": {"sections": ["# "]},
+                "docs/goal.md": {"sections": ["## Goal"]},
+                "docs/architecture.md": {"sections": ["## Parts"]},
+            },
+            "scopes": {"api": {"match": ["*_api.md"], "allow": ["docs/api"]}},
+        }))
+        self.write("README.md", "# Project\n")
+        self.write("docs/goal.md", "## Goal\n")
+        self.write("docs/architecture.md", "## Parts\n")
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def inventory(self, *args):
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), "--inventory", *args],
+            capture_output=True, encoding="utf-8",
+        )
+        return result
+
+    def row(self, output, name):
+        for line in output.splitlines():
+            match = re.match(r"^  (keep|merge|archive|review)\s+(\S+)", line)
+            if match and (match.group(2) == name or match.group(2).endswith("/" + name)):
+                return line
+        return ""
+
+    def test_proposes_keep_merge_and_archive_without_touching_files(self):
+        self.write("modules/user_api.md", "# User API\n")
+        self.write("docs/superpowers/plans/2026-11-21-p1.md", "# Plan\n")
+        self.write("docs/adr/001-choice.md", "# Choice\n")
+
+        result = self.inventory()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("inventory  6 markdown file(s) in scope", result.stdout)
+        self.assertEqual(self.row(result.stdout, "user_api.md").split()[0], "merge")
+        self.assertIn("docs/api", self.row(result.stdout, "user_api.md"))
+        self.assertEqual(self.row(result.stdout, "2026-11-21-p1.md").split()[0], "archive")
+        self.assertEqual(self.row(result.stdout, "001-choice.md").split()[0], "keep")
+        self.assertIn("note  inventory is a proposal", result.stdout)
+        self.assertTrue((self.root / "modules" / "user_api.md").is_file())
+
+    def test_inventory_respects_published_scope(self):
+        self.write(".gitignore", "docs/\n")
+        self.write("modules/user_api.md", "# User API\n")
+
+        result = self.inventory("--published")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("skip  local-only (not published): docs/goal.md, docs/architecture.md", result.stdout)
+        self.assertNotIn("docs/goal.md", result.stdout.split("inventory", 1)[1])
+
+
+class ScopeTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md"]},
+            "files": {"README.md": {"sections": ["# "]}},
+            "scopes": {"api": {"match": ["*_api.md", "api_*.md"], "allow": ["docs/api"]}},
+        }))
+        self.write("README.md", "# Project\n")
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def test_api_documents_outside_their_home_are_flagged(self):
+        self.write("modules/user_api.md", "# User API\n")
+        self.write("docs/api/order_api.md", "# Order API\n")
+
+        result = self.check_project()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        warnings = [line for line in result.stdout.splitlines() if line.startswith("WARN")]
+        self.assertEqual(warnings, ["WARN  duplicate scope (api): modules/user_api.md belongs in docs/api"])
+
+    def test_no_warning_when_every_document_is_at_home(self):
+        self.write("docs/api/user_api.md", "# User API\n")
+
+        result = self.check_project()
+
+        self.assertIn("ok    one home per document scope", result.stdout)
+
+
+class BudgetTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md"]},
+            "files": {"README.md": {"sections": ["# "]}},
+            "budgets": {"docs": 2},
+        }))
+        self.write("README.md", "# Project\n")
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def test_growing_doc_set_warns_and_archives_do_not_count(self):
+        for name in ("goal.md", "architecture.md", "notes.md"):
+            self.write("docs/" + name, "# Doc\n")
+        for name in ("01-first.md", "02-second.md", "03-third.md"):
+            self.write("docs/history/" + name, "# Phase\n")
+
+        result = self.check_project()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        warnings = [line for line in result.stdout.splitlines() if line.startswith("WARN")]
+        self.assertEqual(
+            warnings,
+            ["WARN  budget (docs): 3 file(s), limit 2; merge or archive before adding more"],
+        )
+
+    def test_budget_within_limit_is_reported_as_ok(self):
+        self.write("docs/goal.md", "# Doc\n")
+
+        result = self.check_project()
+
+        self.assertIn("ok    budget (docs): 1/2 file(s)", result.stdout)
 
 
 class ConfigExtendsTests(unittest.TestCase):

@@ -30,6 +30,7 @@ docs/                       本项目文档（本地，不发布）
 - 校验含 `docs/` 的本地文档集：`python scripts/check_docs.py -root . -stage founding`
 - 校验这次提交真正包含的文档：加 `--staged`；占位符与疑似凭据直接判失败：加 `--strict`
 - 存量项目：`-config references/checks-stock.json` 只放宽长度上限
+- 一份文档只有一个家：`--inventory` 列出每份文档的角色与 keep/merge/archive 建议；归属规则与 `docs/` 预算在 `references/checks.json`
 - 阶段累计（`founding` → `milestone` → `release`）；退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误。没有 Python 时按 `references/checklist.md` 人工核对。
 
 ## 文档

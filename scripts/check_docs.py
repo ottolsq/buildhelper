@@ -35,6 +35,20 @@ HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
 HEADING_END_RE = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
 ADR_NAME_RE = re.compile(r"^(\d{3})-")
 SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
+DATED_NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[-_]")
+DESIGN_NAME_RE = re.compile(r"(?:^|[-_])design\.md$|^design\.md$")
+OVERVIEW_NAME_RE = re.compile(r"(?:^|[-_])(?:modules?|overview)\.md$")
+PROCESS_DIRS = {"superpowers", "plans", "specs", "drafts", "scratch", "tmp", "temp", "old", "wip"}
+ARCHIVE_DIRS = {"adr", "history", "postmortems"}
+CORE_ROLES = {
+    "README.md": "entry",
+    "AGENTS.md": "agent",
+    "CHANGELOG.md": "changes",
+    "docs/goal.md": "goal",
+    "docs/architecture.md": "architecture",
+    "docs/plan.md": "plan",
+    "docs/test-records.md": "records",
+}
 
 EXIT_OK = 0
 EXIT_FINDINGS = 1
@@ -507,6 +521,122 @@ def check_secrets(root, files, rules, allow_re, strict, report):
     print("note  secret scan: patterns only; git history and untracked files are not scanned; not exhaustive")
 
 
+def classify_document(relative_path, core_names, scopes):
+    """Guess a document's role and the action that would consolidate it.
+
+    The answer is a proposal for a human to confirm, never something the
+    validator acts on: moving or deleting files is the user's decision.
+    """
+    name = relative_path.rsplit("/", 1)[-1]
+    parts = relative_path.split("/")[:-1]
+    if relative_path in core_names or relative_path in CORE_ROLES:
+        return "keep", CORE_ROLES.get(relative_path, "core"), ""
+    if "adr" in parts:
+        return "keep", "decision", ""
+    if "history" in parts or "postmortems" in parts:
+        return "keep", "archive", ""
+    if name.startswith("README"):
+        return "keep", "entry", ""
+    if name == "SKILL.md":
+        return "keep", "skill", ""
+    if name in ("AGENTS.md", "CLAUDE.md"):
+        return "keep", "agent", ""
+    if name.startswith("CHANGELOG"):
+        return "keep", "changes", ""
+    if name.startswith("INSTALL"):
+        return "keep", "install", ""
+    if name.startswith(("DEPLOY", "DEPLOYMENT")):
+        return "keep", "ops", ""
+    for role, rule in scopes.items():
+        patterns = rule.get("match") or []
+        if not any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns):
+            continue
+        allow = [item.rstrip("/") for item in (rule.get("allow") or [])]
+        if under_roots(relative_path, allow):
+            return "keep", role, ""
+        return "merge", role, allow[0] if allow else ""
+    if any(part in PROCESS_DIRS for part in parts) or DATED_NAME_RE.match(name):
+        return "archive", "process", "docs/history/"
+    if DESIGN_NAME_RE.search(name) or OVERVIEW_NAME_RE.search(name):
+        return "merge", "architecture", "docs/architecture.md"
+    return "review", "other", ""
+
+
+def inventory_report(root, markdown, settings, files, index):
+    """Print one row per document: what it is, and what would consolidate it."""
+    core_names = set(files)
+    scopes = settings.get("scopes") or {}
+    rows = []
+    for path in markdown:
+        rel = relative(path, root)
+        action, role, target = classify_document(rel, core_names, scopes)
+        if index is None:
+            source = "?"
+        else:
+            source = "git" if rel in index else "local"
+        rows.append((action, rel, role, len(read_text(path).splitlines()), target, source))
+    order = {"merge": 0, "archive": 1, "review": 2, "keep": 3}
+    rows.sort(key=lambda row: (order.get(row[0], 9), row[1]))
+    counts = {}
+    for row in rows:
+        counts[row[0]] = counts.get(row[0], 0) + 1
+    summary = ", ".join(
+        "{0} {1}".format(counts[key], key) for key in ("keep", "merge", "archive", "review") if key in counts
+    )
+    print("")
+    print("inventory  {0} markdown file(s) in scope; {1}".format(len(rows), summary))
+    print("  {0:<8} {1:<52} {2:<13} {3:>5}  {4:<5} {5}".format("action", "path", "role", "lines", "src", "target"))
+    for action, rel, role, lines, target, source in rows:
+        shown = rel if len(rel) <= 52 else "..." + rel[-49:]
+        print("  {0:<8} {1:<52} {2:<13} {3:>5}  {4:<5} {5}".format(action, shown, role, lines, source, target))
+    if counts.get("merge") or counts.get("archive") or counts.get("review"):
+        print("note  inventory is a proposal: confirm it before moving, merging, or deleting anything")
+
+
+def check_scopes(root, markdown, settings, report):
+    """Every document belongs in exactly one place; near-duplicates get flagged."""
+    scopes = settings.get("scopes") or {}
+    if not scopes:
+        return
+    hits = 0
+    for path in markdown:
+        rel = relative(path, root)
+        name = rel.rsplit("/", 1)[-1]
+        for role, rule in scopes.items():
+            patterns = rule.get("match") or []
+            if not any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns):
+                continue
+            allow = [item.rstrip("/") for item in (rule.get("allow") or [])]
+            if under_roots(rel, allow):
+                continue
+            hits += 1
+            report.warn("duplicate scope ({0}): {1} belongs in {2}".format(role, rel, ", ".join(allow) or "one place"))
+    if hits == 0:
+        report.ok("one home per document scope")
+
+
+def check_budget(root, markdown, settings, report):
+    """Archives may grow; the working doc set may not."""
+    budgets = settings.get("budgets") or {}
+    for directory, limit in budgets.items():
+        if not isinstance(limit, int) or limit <= 0:
+            continue
+        prefix = directory.strip("/") + "/"
+        count = 0
+        for path in markdown:
+            rel = relative(path, root)
+            if not rel.startswith(prefix):
+                continue
+            nested = rel[len(prefix):].split("/")[:-1]
+            if any(part in ARCHIVE_DIRS for part in nested):
+                continue
+            count += 1
+        if count > limit:
+            report.warn("budget ({0}): {1} file(s), limit {2}; merge or archive before adding more".format(directory, count, limit))
+        else:
+            report.ok("budget ({0}): {1}/{2} file(s)".format(directory, count, limit))
+
+
 def run(args):
     root = Path(args.root).expanduser().resolve()
     if not root.is_dir():
@@ -523,6 +653,12 @@ def run(args):
     material_root = Path(__file__).resolve().parent.parent / "references"
     ignore_rules = load_gitignore(root)
     index = index_paths(root) if args.staged else None
+    inventory_index = index
+    if args.inventory and inventory_index is None:
+        try:
+            inventory_index = index_paths(root)
+        except ConfigError:
+            inventory_index = None
 
     print("config " + str(config))
 
@@ -571,7 +707,11 @@ def run(args):
         skipped_paths = len(ignored_paths)
 
     report = Report()
+    if args.inventory:
+        inventory_report(root, markdown, settings, files, inventory_index)
     check_required(root, files, names, report)
+    check_scopes(root, markdown, settings, report)
+    check_budget(root, markdown, settings, report)
     check_links(root, markdown, report, unpublished, label, clean_message)
     check_adr(root, ignore_rules if args.published else (), report, tracked=index)
     check_placeholders(root, markdown, settings, args.strict, report)
@@ -605,6 +745,7 @@ def main(argv=None):
     parser.add_argument("-stage", "--stage", default="founding", help="founding (default) / milestone / release; stages are cumulative")
     parser.add_argument("-published", "--published", action="store_true", help="check only files that a clone would receive (skips gitignored ones)")
     parser.add_argument("-staged", "--staged", action="store_true", help="check exactly what the git index would commit (needs a git work tree)")
+    parser.add_argument("-inventory", "--inventory", action="store_true", help="list every document with its role and a consolidation proposal (reads only)")
     parser.add_argument("-strict", "--strict", action="store_true", help="treat unfilled placeholders and possible secrets as failures")
     args = parser.parse_args(argv)
 

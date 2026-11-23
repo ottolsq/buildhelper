@@ -13,7 +13,8 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 - 新项目从零建立文档骨架
 - 里程碑开始时写本期计划，结束时写阶段结论
 - 发版前对齐 README、CHANGELOG、测试记录
-- 文档审计：检查缺失文件、断链、过期命令、重复的 ADR 编号
+- 文档审计：检查缺失文件、断链、过期命令、重复的 ADR 编号、同一件事的多份副本
+- 文档越积越多，需要收敛到唯一归属
 
 ## 何时不用
 
@@ -38,6 +39,18 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 阶段门之外不主动生成文档。用户没有说要发版，就不要写 CHANGELOG。
 
+## 三种调用场景
+
+同一个 skill，三套起手式。先判断处在哪一步，再决定要不要新建文件。
+
+| 场景 | 起手动作 | 产物 |
+|---|---|---|
+| 开工（bootstrap） | 探测项目类型 + 盘点已有文档 | 缺失的核心文档骨架 |
+| 中期（maintain） | 读 `docs/plan.md` 的当前里程碑 | 只补缺、只校准 |
+| 收尾 / 整理（consolidate） | 先跑 `--inventory`，出清单等确认 | 合并、归档、删除后的收敛结果 |
+
+判断错了代价很高：中期误当开工＝重复造文档；开工误当整理＝把仅有的几份也清掉。拿不准就直接问用户处在哪一步。
+
 ## 执行顺序
 
 1. **探测（只读）** — 见下节；先看清项目是什么，再决定写什么。
@@ -47,6 +60,30 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
 6. **自检** — 运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。准备提交时再加 `--staged`，校验的是「这次提交真正会包含的文档」，与本地全量校验互补。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
+
+## 一份文档只有一个家
+
+文档乱的根因不是数量，是同一件事有几份文档。新建文件之前先查这张表；表里没有归属的先问，默认不建。
+
+| 内容 | 唯一位置 | 入库 |
+|---|---|---|
+| 入口、安装、许可 | `README.md`、`INSTALL.md`、`LICENSE` | 是 |
+| agent 约束 | `AGENTS.md` | 是 |
+| 版本变化 | `CHANGELOG.md` | 是 |
+| 目标与非目标 | `docs/goal.md` | 否 |
+| 架构、模块边界 | `docs/architecture.md`（模块多才拆 `docs/modules/`） | 否 |
+| 里程碑与 DoD | `docs/plan.md` | 否 |
+| 决策与理由 | `docs/adr/NNN-*.md` | 否 |
+| 对外接口契约 | `docs/api/` | 对外才推 |
+| 验收与缺陷 | `docs/test-records.md` | 否 |
+| 阶段结论、复盘 | `docs/history/`、`docs/postmortems/` | 否 |
+
+三条推论：
+
+- `*_api.md`、`*_module.md` 散落在模块目录，就是同一件事的多个副本，校验器会报 `duplicate scope`。
+- 归档目录（`adr/`、`history/`、`postmortems/`）允许增长；`docs/` 其余文件有预算（`checks.json` 的 `budgets`），超了说明该合并，而不是接着加。
+- 过程物料（`plans/`、`specs/`、带日期的设计稿）用完归档成一份阶段结论，原件不要留在现行文档里。
+
 
 ## 存量整理（仅在用户明确要求时）
 
@@ -93,10 +130,13 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 - 存量项目不要为了通过长度检查去压缩 README：先补缺失文档，超长记为已知（2026-11-22 ctrip：168 行 vs 上限 40，压缩等于重写）
 - 把「整理」做成「旧文档原样搬进 `docs/history/`」：归档不是去处，结论必须有新的落点，引用也要跟着改
 - 只按 README 索引盘点存量文档：没被索引的文件永远处理不到，而它们往往最该处理
+- 同一件事开第二份文档：先查「一份文档只有一个家」，有归属就合并进去
+- 把 `*_api.md`、`*_module.md` 平铺在模块目录里：这是同一文档的副本，校验会报 `duplicate scope`
+- 整理只搬运不收敛：`docs/` 超出 `budgets` 说明还在堆积，搬进 `docs/history/` 不等于处理
 
 ## 校验
 
-`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、ADR 编号、残留占位符、**疑似凭据**。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
+`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、**重复归属**（`*_api.md` 之类不在唯一位置）、**文档预算**（`docs/` 下的文件数）、ADR 编号、残留占位符、**疑似凭据**。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
 ```text
 python3 scripts/check_docs.py -root <项目根> -stage founding   # macOS / Linux
@@ -115,13 +155,15 @@ python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 
 `--staged` 读的是索引而不是 `.gitignore`，所以「已跟踪但被忽略」的文件照常校验；未跟踪的文档会报 `skip untracked`，工作区与索引内容不同会报 `note worktree differs`（校验的仍是工作区内容）。它不是仓库或无 git 时以 `2` 退出并说明原因。
 
+`--inventory` 是只读报告：为每份文档标出角色（`entry` / `goal` / `architecture` / `api` / `process` …）、行数、是否入库，以及处置建议 `keep` / `merge` / `archive` / `review` 和目标位置。它不移动、不删除任何文件。整理场景先跑它，把表格交给用户确认，再按批准的范围动手。
+
 凭据扫描是**规则匹配，不是保证**：只匹配常见 Token、云访问密钥、私钥头、带口令的 URL、`password=` 之类的赋值，命中时只输出 `文件:行号` 和规则名，绝不回显原文；`<your-token>`、`xxx`、`example` 这类占位符放行。它不查 Git 历史、不扫被忽略的文件，也不承诺能识别全部秘密——真实凭据不要写进文档，改用环境变量。默认报 WARN，`--strict` 升为 FAIL。
 
 退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏、阶段名不认识、`--published` 与 `--staged` 同时给）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。
 
 扫描范围按模式不同：本地模式照常读取必填文件所在的本地文档目录（通常就是被忽略的 `docs/`），其他被忽略路径（归档、生成物、`study/` 这类研究目录）跳过，并打印 `skip  gitignored (not scanned)` 列出排除了哪些；`--published` 只扫会随仓库发布的文件。每次运行都会打印 `config <配置文件>` 和一行 `scan ...`，写明扫了几份、跳过几份，判断「没报警」是真没问题还是没扫到，看这几行。代码围栏里的示例链接和 `<!-- fill -->` 不算真链接、也不算未填占位符。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
 
-阶段、章节、长度都在 `references/checks.json`，要加检查项就改那个文件，不改脚本。
+阶段、章节、长度、文档预算、归属规则都在 `references/checks.json`，要加检查项就改那个文件，不改脚本。
 
 ### 项目适配
 

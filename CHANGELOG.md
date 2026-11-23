@@ -6,6 +6,11 @@
 
 ### 新增
 
+- `--inventory`：只读盘点，为每份文档标出角色、行数、是否入库，以及 `keep` / `merge` / `archive` / `review` 处置建议和目标位置；不移动、不删除文件。
+- `scopes`：同一类文档只能有一个家，`*_api.md`、`*_module.md` 出现在 `docs/api`、`docs/architecture.md` 之外时报 `duplicate scope`。
+- `budgets`：`docs/` 下未归档的文档数超出预算时报 WARN；`adr/`、`history/`、`postmortems/` 不计入。
+- `SKILL.md` 增加「三种调用场景」（开工 / 中期 / 收尾整理）与「一份文档只有一个家」归属表。
+- `references/checklist.md` 增加 inventory 与归属、预算条目。
 - CI 增加一步：运行 `scripts/test_check_docs.py`（stdlib unittest，不引入 pytest）。
 - `--staged`：以 git 索引为准校验「这次提交会包含的文档」，已跟踪但被忽略的文件照常检查，未跟踪文件报 `skip`；与 `--published` 互斥。
 - 凭据扫描：内置 GitHub Token、AWS 访问密钥、私钥头、带口令 URL、`password=` 赋值等规则；命中只报文件、行号与规则名，不回显原文；占位符放行，`--strict` 时升为 FAIL。

@@ -30,6 +30,7 @@ docs/                        this project's docs (local, not published)
 - Local doc set including `docs/`: `python scripts/check_docs.py -root . -stage founding`
 - What a commit would contain: add `--staged`; make placeholders and secrets fail: add `--strict`
 - Existing projects: `-config references/checks-stock.json` relaxes page-length limits only
+- One home per document: `--inventory` lists every file with a role and a keep/merge/archive proposal; `scopes` and the `docs/` budget live in `references/checks.json`
 - Stages accumulate (`founding`, `milestone`, `release`); exit `0` pass, `1` findings, `2` usage error. Without Python, use `references/checklist.md`.
 
 ## Docs

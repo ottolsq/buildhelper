@@ -13,6 +13,11 @@
     "docs/plan.md": { "sections": ["## 当前里程碑", "### 完成定义（DoD）", "### 风险"], "maxLines": 80 },
     "CHANGELOG.md": { "sections": ["## "], "maxLines": null }
   },
+  "budgets": { "docs": 8 },
+  "scopes": {
+    "api": { "match": ["*_api.md", "api_*.md"], "allow": ["docs/api"] },
+    "module": { "match": ["*_module.md"], "allow": ["docs/architecture.md", "docs/modules"] }
+  },
   "secrets": {
     "enabled": true,
     "rules": [
