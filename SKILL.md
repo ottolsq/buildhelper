@@ -155,7 +155,7 @@ python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 
 `--staged` 读的是索引而不是 `.gitignore`，所以「已跟踪但被忽略」的文件照常校验；未跟踪的文档会报 `skip untracked`，工作区与索引内容不同会报 `note worktree differs`（校验的仍是工作区内容）。它不是仓库或无 git 时以 `2` 退出并说明原因。
 
-`--inventory` 是只读报告：为每份文档标出角色（`entry` / `goal` / `architecture` / `api` / `process` …）、行数、是否入库，以及处置建议 `keep` / `merge` / `archive` / `review` 和目标位置。它不移动、不删除任何文件。整理场景先跑它，把表格交给用户确认，再按批准的范围动手。
+`--inventory` 是只读报告：为每份文档标出角色（`entry` / `goal` / `architecture` / `api` / `process` …）、行数、是否入库，以及处置建议 `keep` / `merge` / `archive` / `review` 和目标位置。落在某个归属目录里的文档（例如 `docs/api/`、`docs/modules/`、根 `API.md`）直接算 `keep`，不看文件名是否匹配通配符；`merge` 的目标是该归属的第一个允许位置。它不移动、不删除任何文件。整理场景先跑它，把表格交给用户确认，再按批准的范围动手。
 
 凭据扫描是**规则匹配，不是保证**：只匹配常见 Token、云访问密钥、私钥头、带口令的 URL、`password=` 之类的赋值，命中时只输出 `文件:行号` 和规则名，绝不回显原文；`<your-token>`、`xxx`、`example` 这类占位符放行。它不查 Git 历史、不扫被忽略的文件，也不承诺能识别全部秘密——真实凭据不要写进文档，改用环境变量。默认报 WARN，`--strict` 升为 FAIL。
 

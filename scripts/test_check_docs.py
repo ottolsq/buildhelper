@@ -336,7 +336,7 @@ class InventoryTests(unittest.TestCase):
                 "docs/goal.md": {"sections": ["## Goal"]},
                 "docs/architecture.md": {"sections": ["## Parts"]},
             },
-            "scopes": {"api": {"match": ["*_api.md"], "allow": ["docs/api"]}},
+            "scopes": {"api": {"match": ["*_api.md"], "allow": ["docs/api", "API.md"]}},
         }))
         self.write("README.md", "# Project\n")
         self.write("docs/goal.md", "## Goal\n")
@@ -377,6 +377,17 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(self.row(result.stdout, "001-choice.md").split()[0], "keep")
         self.assertIn("note  inventory is a proposal", result.stdout)
         self.assertTrue((self.root / "modules" / "user_api.md").is_file())
+
+    def test_files_in_a_role_home_keep_even_without_the_name_pattern(self):
+        self.write("API.md", "# API\n")
+        self.write("docs/api/user.md", "# User API\n")
+
+        result = self.inventory()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.row(result.stdout, "API.md").split()[0], "keep")
+        self.assertIn("api", self.row(result.stdout, "API.md"))
+        self.assertEqual(self.row(result.stdout, "user.md").split()[0], "keep")
 
     def test_inventory_respects_published_scope(self):
         self.write(".gitignore", "docs/\n")

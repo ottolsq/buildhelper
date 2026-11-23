@@ -548,6 +548,10 @@ def classify_document(relative_path, core_names, scopes):
     if name.startswith(("DEPLOY", "DEPLOYMENT")):
         return "keep", "ops", ""
     for role, rule in scopes.items():
+        allow = [item.rstrip("/") for item in (rule.get("allow") or [])]
+        if allow and under_roots(relative_path, allow):
+            return "keep", role, ""
+    for role, rule in scopes.items():
         patterns = rule.get("match") or []
         if not any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns):
             continue

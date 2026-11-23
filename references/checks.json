@@ -15,7 +15,7 @@
   },
   "budgets": { "docs": 8 },
   "scopes": {
-    "api": { "match": ["*_api.md", "api_*.md"], "allow": ["docs/api"] },
+    "api": { "match": ["*_api.md", "api_*.md"], "allow": ["docs/api", "API.md"] },
     "module": { "match": ["*_module.md"], "allow": ["docs/architecture.md", "docs/modules"] }
   },
   "secrets": {

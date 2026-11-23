@@ -18,6 +18,7 @@
 - `references/checks-stock.json`：存量项目起点配置，只放宽既有 README 与架构文档的长度上限。
 - `SKILL.md` 增加「存量整理」流程：递归盘点（不依赖 README 索引）→ 四类标注（保留/合并/仅本地/删除）→ 指明合并去处与引用更新 → 等确认 → 复验。仅在用户明确要求时执行。
 - `references/checklist.md` 增加存量整理清单。
+- `--inventory` 把落在归属目录里的文档（`docs/api/`、`docs/modules/`、根 `API.md`）直接判为 `keep`，不再因为文件名不匹配通配符而落到 `review`；`scopes.api` 的允许位置增加根 `API.md`，`merge` 目标仍是归属的第一个位置。
 
 ### 变更
 
