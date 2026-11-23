@@ -103,5 +103,76 @@ class PublishedBoundaryTests(unittest.TestCase):
         )
 
 
+class ScanScopeTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md", "docs/goal.md"]},
+            "files": {
+                "README.md": {"sections": ["# "]},
+                "docs/goal.md": {"sections": ["## Goal"]},
+            },
+        }))
+        self.write("README.md", "# Project\n")
+        self.write(".gitignore", "docs/\nstudy/\n")
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def test_local_mode_reads_the_local_doc_set_and_skips_the_rest(self):
+        self.write("docs/goal.md", "## Goal\n\n[gone](missing-doc.md)\n")
+        self.write("study/note.md", "[noise](missing-study.md)\n")
+
+        result = self.check_project()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("WARN  broken link in docs/goal.md: missing-doc.md", result.stdout)
+        self.assertNotIn("missing-study.md", result.stdout)
+        self.assertIn("1 gitignored path(s) skipped (study/note.md)", result.stdout)
+        self.assertIn("local doc set still read: docs", result.stdout)
+
+    def test_published_mode_does_not_read_ignored_docs(self):
+        self.write("docs/goal.md", "## Goal\n\n[gone](missing-doc.md)\n")
+
+        result = self.check_project("--published")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("missing-doc.md", result.stdout)
+        self.assertIn("skip  local-only (not published): docs/goal.md", result.stdout)
+
+
+class FenceTests(unittest.TestCase):
+    def test_example_links_inside_fences_are_not_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "checks.json"
+            config.write_text(json.dumps({
+                "stages": {"founding": ["README.md"]},
+                "files": {"README.md": {"sections": ["# "]}},
+            }), encoding="utf-8")
+            (root / "README.md").write_text(
+                "# Project\n\n```text\n[example](missing-by-example.md)\n```\n\n[real](gone.md)\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(config)],
+                capture_output=True, encoding="utf-8",
+            )
+
+            warnings = [line for line in result.stdout.splitlines() if line.startswith("WARN")]
+            self.assertEqual(warnings, ["WARN  broken link in README.md: gone.md"])
+
+
 if __name__ == "__main__":
     unittest.main()

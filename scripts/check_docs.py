@@ -146,7 +146,42 @@ def is_ignored(relative_path, rules):
     return False
 
 
-def iter_markdown(root, material_root, ignore_rules):
+def mask_fenced(text):
+    """Blank out fenced code blocks, keeping line numbers.
+
+    Example links and template markers live inside fences on purpose: they are
+    illustrations, not real links or unfilled placeholders.
+    """
+    out = []
+    fence = ""
+    for line in text.splitlines(True):
+        match = FENCE_RE.match(line.rstrip("\r\n"))
+        if fence:
+            if match and match.group(1).startswith(fence) and not match.group(2).strip(" \t"):
+                fence = ""
+            out.append(re.sub(r"[^\r\n]", " ", line))
+            continue
+        if match and (match.group(1).startswith("~") or "`" not in match.group(2)):
+            fence = match.group(1)
+            out.append(re.sub(r"[^\r\n]", " ", line))
+            continue
+        out.append(line)
+    return "".join(out)
+
+
+def under_roots(relative_posix, roots):
+    return any(relative_posix == root or relative_posix.startswith(root + "/") for root in roots)
+
+
+def collect_markdown(root, material_root, ignore_rules, scan_ignored_roots=()):
+    """Return (files to scan, gitignored paths skipped).
+
+    Local mode still reads documentation that the project keeps out of git (its
+    ``docs/`` tree): the required files decide which ignored directory is the
+    local document set, so build outputs and archived studies stay out.
+    """
+    files = []
+    skipped = []
     for path in sorted(root.rglob("*.md")):
         if not path.is_file():
             continue
@@ -156,14 +191,17 @@ def iter_markdown(root, material_root, ignore_rules):
             continue
         if any(part in SKIP_DIRS for part in rel.parts):
             continue
-        if is_ignored(rel.as_posix(), ignore_rules):
+        posix = rel.as_posix()
+        if is_ignored(posix, ignore_rules) and not under_roots(posix, scan_ignored_roots):
+            skipped.append(posix)
             continue
         try:
             if material_root is not None and material_root in path.resolve().parents:
                 continue
         except OSError:
             continue
-        yield path
+        files.append(path)
+    return files, skipped
 
 
 def markdown_headings(text):
@@ -238,11 +276,11 @@ def warn_if_container(root, report):
         )
 
 
-def check_links(root, material_root, ignore_rules, report):
+def check_links(root, files, ignore_rules, report):
     broken = 0
     unpublished = 0
-    for path in iter_markdown(root, material_root, ignore_rules):
-        for target in LINK_RE.findall(read_text(path)):
+    for path in files:
+        for target in LINK_RE.findall(mask_fenced(read_text(path))):
             target = target.strip()
             if not target or SCHEME_RE.match(target):
                 continue
@@ -260,7 +298,7 @@ def check_links(root, material_root, ignore_rules, report):
                 target_rel = candidate.resolve().relative_to(root).as_posix()
             except (ValueError, OSError):
                 continue
-            if is_ignored(target_rel, ignore_rules):
+            if is_ignored(target_rel, ignore_rules) and not is_ignored(relative(path, root), ignore_rules):
                 unpublished += 1
                 report.warn("published file {0} links to ignored path: {1}".format(relative(path, root), target))
     if broken == 0:
@@ -295,11 +333,11 @@ def check_adr(root, ignore_rules, report):
         report.ok("adr numbering contiguous: {0} file(s)".format(len(seen)))
 
 
-def check_placeholders(root, material_root, settings, ignore_rules, strict, report):
+def check_placeholders(files, settings, strict, report):
     marker = settings.get("placeholderMarker") or "<!-- fill"
     hits = 0
-    for path in iter_markdown(root, material_root, ignore_rules):
-        body = INLINE_CODE_RE.sub("", read_text(path))
+    for path in files:
+        body = INLINE_CODE_RE.sub("", mask_fenced(read_text(path)))
         count = body.count(marker)
         if count <= 0:
             continue
@@ -330,22 +368,35 @@ def run(args):
         raise ConfigError("config not found: " + str(config))
 
     settings, stages, files = load_rules(config)
-    names = required_files(stages, args.stage)
+    all_names = required_files(stages, args.stage)
     material_root = Path(__file__).resolve().parent.parent / "references"
     ignore_rules = load_gitignore(root)
+
+    names = all_names
+    scan_ignored_roots = sorted({name.split("/")[0] for name in all_names if "/" in name and is_ignored(name, ignore_rules)})
     if args.published:
-        skipped = [name for name in names if is_ignored(name, ignore_rules)]
-        names = [name for name in names if not is_ignored(name, ignore_rules)]
+        skipped = [name for name in all_names if is_ignored(name, ignore_rules)]
+        names = [name for name in all_names if not is_ignored(name, ignore_rules)]
+        scan_ignored_roots = ()
         if skipped:
             print("skip  local-only (not published): " + ", ".join(skipped))
 
+    markdown, ignored_paths = collect_markdown(root, material_root, ignore_rules, scan_ignored_roots)
+
     report = Report()
     check_required(root, files, names, report)
-    check_links(root, material_root, ignore_rules, report)
+    check_links(root, markdown, ignore_rules, report)
     check_adr(root, ignore_rules if args.published else (), report)
-    check_placeholders(root, material_root, settings, ignore_rules, args.strict, report)
+    check_placeholders(markdown, settings, args.strict, report)
     warn_if_container(root, report)
 
+    scope = "{0} markdown file(s) scanned".format(len(markdown))
+    if scan_ignored_roots:
+        scope += "; local doc set still read: " + ", ".join(scan_ignored_roots)
+    if ignored_paths:
+        sample = ", ".join(ignored_paths[:3]) + (", ..." if len(ignored_paths) > 3 else "")
+        scope += "; {0} gitignored path(s) skipped ({1})".format(len(ignored_paths), sample)
+    print("scan  " + scope)
     print("")
     suffix = ", published only" if args.published else ""
     print("{0} failure(s), {1} warning(s) under {2} (stage: {3}{4})".format(report.failures, report.warnings, root, args.stage, suffix))
