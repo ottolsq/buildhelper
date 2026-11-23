@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Turn "which documents a project needs, when to write them, and how to keep them from rotting" into a workflow an agent can execute. Not a document generator — a constraint layer: what to produce at which stage, fill gaps only, and validate what you wrote. Current: 0.2.0, clone and use.
+Turn "which documents a project needs, when to write them, and how to keep them from rotting" into a workflow an agent can execute. Not a document generator — a constraint layer: what to produce at which stage, fill gaps only, and validate what you wrote. Current: 0.3.0, clone and use.
 
 ## Install
 
