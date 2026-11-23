@@ -18,7 +18,7 @@ git clone <repo-url> .agents/skills/project-docs
 
 ```
 SKILL.md                     workflow, stage gates, anti-patterns
-references/                  checks.json, checklist, 9 templates
+references/                  checks.json, checks-stock.json, checklist, 9 templates
 scripts/check_docs.py        validator (Python 3.8+, stdlib only)
 scripts/test_check_docs.py   unit tests for the validator
 docs/                        this project's docs (local, not published)
@@ -28,9 +28,9 @@ docs/                        this project's docs (local, not published)
 
 - Published surface, as a fresh clone sees it: `python scripts/check_docs.py -root . -stage release --published`
 - Local doc set including `docs/`: `python scripts/check_docs.py -root . -stage founding`
-- Stages accumulate: `founding`, `milestone`, `release`.
-
-Use `python3` on macOS/Linux. Exit codes: `0` pass, `1` findings, `2` usage or configuration error. Without Python, work through `references/checklist.md` by hand.
+- What a commit would contain: add `--staged`; make placeholders and secrets fail: add `--strict`
+- Existing projects: `-config references/checks-stock.json` relaxes page-length limits only
+- Stages accumulate (`founding`, `milestone`, `release`); exit `0` pass, `1` findings, `2` usage error. Without Python, use `references/checklist.md`.
 
 ## Docs
 

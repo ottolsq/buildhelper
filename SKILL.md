@@ -45,7 +45,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 3. **询问** — 只问三件事：一句话目标、谁用、本期做到哪算完成。
 4. **生成** — 只写缺失项；从 `references/templates/` 复制，替换掉所有 `<!-- fill -->`。
 5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
-6. **自检** — 运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。
+6. **自检** — 运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。准备提交时再加 `--staged`，校验的是「这次提交真正会包含的文档」，与本地全量校验互补。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
 
 ## 存量整理（仅在用户明确要求时）
@@ -96,7 +96,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 校验
 
-`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、ADR 编号、残留占位符。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
+`scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、ADR 编号、残留占位符、**疑似凭据**。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
 ```text
 python3 scripts/check_docs.py -root <项目根> -stage founding   # macOS / Linux
@@ -105,17 +105,38 @@ python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 
 `-stage` 三档，累计：`founding`（默认，README / goal / architecture / AGENTS）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
 
-加 `--published` 只校验发布物：被 `.gitignore` 忽略的文件从必填清单里剔除。克隆下来的仓库没有本地的 `docs/`，CI 和「验收入库内容」都用这个模式；本地全量校验不加它。
+三种范围，互斥，选一个：
 
-退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏、阶段名不认识）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。
+| 模式 | 校验对象 | 用在哪 |
+|---|---|---|
+| 本地（默认） | 磁盘上的全部文档，含被忽略的 `docs/` | 写文档时的自检 |
+| `--published` | 只校验会随仓库发布的文件，被忽略的从必填清单剔除 | CI、验收克隆下来的仓库 |
+| `--staged` | git 索引：这次提交真正会包含的文件 | 提交前、pre-commit |
 
-扫描范围两种模式不同：本地模式照常读取必填文件所在的本地文档目录（通常就是被忽略的 `docs/`），其他被忽略路径（归档、生成物、`study/` 这类研究目录）跳过；`--published` 只扫会随仓库发布的文件。每次运行都会打印一行 `scan ...`，写明扫了几份、跳过几份、为什么，判断「没报警」是真没问题还是没扫到，看这一行。代码围栏里的示例链接和 `<!-- fill -->` 不算真链接、也不算未填占位符。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
+`--staged` 读的是索引而不是 `.gitignore`，所以「已跟踪但被忽略」的文件照常校验；未跟踪的文档会报 `skip untracked`，工作区与索引内容不同会报 `note worktree differs`（校验的仍是工作区内容）。它不是仓库或无 git 时以 `2` 退出并说明原因。
+
+凭据扫描是**规则匹配，不是保证**：只匹配常见 Token、云访问密钥、私钥头、带口令的 URL、`password=` 之类的赋值，命中时只输出 `文件:行号` 和规则名，绝不回显原文；`<your-token>`、`xxx`、`example` 这类占位符放行。它不查 Git 历史、不扫被忽略的文件，也不承诺能识别全部秘密——真实凭据不要写进文档，改用环境变量。默认报 WARN，`--strict` 升为 FAIL。
+
+退出码约定：`0` 通过、`1` 有 FAIL、`2` 用法或配置错误（`-root` 不存在、`checks.json` 缺失或语法坏、阶段名不认识、`--published` 与 `--staged` 同时给）。脚本不打印 traceback，错误一律一行 `error: ...`。文档按 UTF-8 → GB18030 依次尝试解码，UTF-8 BOM、CRLF、GBK 都能正确匹配章节。
+
+扫描范围按模式不同：本地模式照常读取必填文件所在的本地文档目录（通常就是被忽略的 `docs/`），其他被忽略路径（归档、生成物、`study/` 这类研究目录）跳过，并打印 `skip  gitignored (not scanned)` 列出排除了哪些；`--published` 只扫会随仓库发布的文件。每次运行都会打印 `config <配置文件>` 和一行 `scan ...`，写明扫了几份、跳过几份，判断「没报警」是真没问题还是没扫到，看这几行。代码围栏里的示例链接和 `<!-- fill -->` 不算真链接、也不算未填占位符。没有 Python 时不要硬跑，按 `references/checklist.md` 人工核对。
 
 阶段、章节、长度都在 `references/checks.json`，要加检查项就改那个文件，不改脚本。
+
+### 项目适配
+
+规则不该逼着项目改文档。存量项目用 `-config` 指向一份自己的配置：
+
+```text
+python scripts/check_docs.py -root . -config references/checks-stock.json
+```
+
+`references/checks-stock.json` 是现成起点：它 `extends` 基础配置，只放宽已有 README 和架构文档的长度上限，其他规则照旧。要更具体的调整，写一份新 JSON 并 `extends` 基础配置——只写差异项，`files` 按文件浅合并，其余键整键覆盖；`extends` 成环以 `2` 退出。
 
 ## 资源
 
 - `references/templates/` — 9 份模板，按阶段门取用。模板一律用 `<名字>.template.md` 命名：`AGENTS.md` 在 Windows 上大小写不敏感，`agents.md` 会被当成真指令注入会话
 - `references/checklist.md` — 交付前逐条勾
-- `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限
-- `scripts/check_docs.py` — 必填文件 / 必填章节 / 相对链接 / ADR 编号 / 占位符
+- `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限、凭据规则
+- `references/checks-stock.json` — 存量项目起点配置：`extends` 基础规则，只放宽长度
+- `scripts/check_docs.py` — 必填文件 / 必填章节 / 相对链接 / ADR 编号 / 占位符 / 发布边界 / 凭据

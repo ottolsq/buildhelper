@@ -6,7 +6,12 @@
 # 校验文档骨架。退出码 0 通过 / 1 有 FAIL / 2 用法或配置错误
 python scripts\check_docs.py -root . -stage founding
 # 阶段累计：milestone 加 docs/plan.md，release 加 CHANGELOG.md
-# 反例：空目录 founding 应 exit 1；release 缺 CHANGELOG 应 exit 1；未知阶段应 exit 2
+# 发布物 / 提交内容 / 存量项目长度放宽
+python scripts\check_docs.py -root . -stage release --published
+python scripts\check_docs.py -root . --staged
+python scripts\check_docs.py -root . -config references\checks-stock.json
+# 反例：空目录 founding 应 exit 1；release 缺 CHANGELOG 应 exit 1；未知阶段应 exit 2；--published 与 --staged 同给应 exit 2
+# 单元测试只能在 CI 跑；本地想验证行为用 python temp\verify_batch2.py（见环境事实）
 ```
 
 ## 禁止事项
@@ -26,7 +31,8 @@ python scripts\check_docs.py -root . -stage founding
 - 校验脚本是 Python：`python scripts\check_docs.py -root .`；`.ps1` 已删除，不要再写 `powershell -File`
 - `Get-Content` 默认按 ANSI 解码，读 UTF-8 中文会乱码（行数也会数错）；读文件必须带 `-Encoding UTF8`
 - 沙箱内 `git clone <本地路径>` 会失败（msys sh 起不来，`0xC0000022`）；要检查提交内容就用 `git archive` 导出，真实 clone 留给沙箱外的终端（2026-11-21 实测）
-- 单元测试 `python scripts/test_check_docs.py` 在本机沙箱内会失败：`tempfile.TemporaryDirectory` 下无法建子目录；它由 CI 运行，本地不要据此判断测试坏了（2026-11-22 实测）
+- 单元测试 `python scripts/test_check_docs.py` 在本机沙箱内必定失败，原因不是测试写错：`tempfile` 用 `os.mkdir(..., 0o700)` 建目录，沙箱令牌随后无法列举该目录（`PermissionError: [WinError 5]`，实测 `os.mkdir(r'temp\m700', 0o700)` 后 `os.listdir` 立即失败，`0o777` 正常）；另外 git 对象文件是只读的，`shutil.rmtree` 删不掉。它由 CI 运行，本地不要据此判断测试坏了（2026-11-23 实测）
+- 本地验证校验器行为用 `python temp\verify_batch2.py`：它用 `os.makedirs` 建夹具、直接驱动 CLI，覆盖 `--staged` / 凭据 / `extends` / 存量配置，结果应与 CI 的单元测试一致
 - 项目根：`C:\Users\ottol\myproject\buildhelper`（git 仓库）
 - 仓库根即 skill 根（ADR-004）：`SKILL.md`、`references/`、`scripts/` 直接在根；装到 `.dsh/skills/` 或跨工具的 `.agents/skills/`，本机尚未安装到任何 agent
 - 文档写入白名单：`README.md`、`CHANGELOG.md`、`AGENTS.md`、`SKILL.md`、`docs/**`、`references/**`、`scripts/**`
@@ -34,6 +40,7 @@ python scripts\check_docs.py -root . -stage founding
 ## 完成定义
 
 - 改 `SKILL.md`、模板、`checks.json` 或 `check_docs.py` 后，必须跑三档 `-stage` 并贴实际输出：正常 `0`、空目录 `1`、坏配置或未知阶段 `2`
+- 改校验器后还要跑 `--published`、`--staged`、`--strict` 与 `-config references\checks-stock.json`，再加 `python temp\verify_batch2.py` 应全 PASS
 - 新增检查项时同时给正例（应 0 FAIL）和反例（应非 0）
 - 文档与实现不一致时先改文档
 

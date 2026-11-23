@@ -1,0 +1,10 @@
+{
+  "_note": "Starting point for adopting an existing project: extends references/checks.json and only relaxes page-length limits, so install and troubleshooting notes that already exist do not have to be cut. Pass it with -config, or copy it into the project and adjust.",
+  "extends": "checks.json",
+  "files": {
+    "README.md": { "maxLines": 200 },
+    "docs/goal.md": { "maxLines": 100 },
+    "docs/architecture.md": { "maxLines": 200 },
+    "AGENTS.md": { "maxLines": 150 }
+  }
+}

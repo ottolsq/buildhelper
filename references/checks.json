@@ -12,5 +12,16 @@
     "AGENTS.md": { "sections": ["## 命令", "## 禁止事项", "## 完成定义"], "maxLines": 100 },
     "docs/plan.md": { "sections": ["## 当前里程碑", "### 完成定义（DoD）", "### 风险"], "maxLines": 80 },
     "CHANGELOG.md": { "sections": ["## "], "maxLines": null }
+  },
+  "secrets": {
+    "enabled": true,
+    "rules": [
+      { "name": "github-token", "pattern": "gh[pousr]_[A-Za-z0-9]{20,}" },
+      { "name": "aws-access-key", "pattern": "AKIA[0-9A-Z]{16}" },
+      { "name": "private-key", "pattern": "-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----" },
+      { "name": "url-credentials", "pattern": "://[^\\s:/@]+:[^\\s@/]+@" },
+      { "name": "assigned-credential", "pattern": "(?i)(?:api[_-]?key|secret|token|password|passwd)\\s*[:=]\\s*[\"']?([A-Za-z0-9_\\-]{12,})", "valueGroup": 1 }
+    ],
+    "allow": "(?i)x{3,}|\\*{3,}|<[^>]*>|\\$\\{[^}]*\\}|your[_-][A-Za-z0-9_-]*|(?:example|sample|dummy|fake|placeholder|changeme|redacted)[A-Za-z0-9_-]*|\\bnull\\b|\\bnone\\b|\\.{3,}"
   }
 }

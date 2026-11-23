@@ -139,7 +139,7 @@ class ScanScopeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("WARN  broken link in docs/goal.md: missing-doc.md", result.stdout)
         self.assertNotIn("missing-study.md", result.stdout)
-        self.assertIn("1 gitignored path(s) skipped (study/note.md)", result.stdout)
+        self.assertIn("skip  gitignored (not scanned): 1 path(s) (study/note.md)", result.stdout)
         self.assertIn("local doc set still read: docs", result.stdout)
 
     def test_published_mode_does_not_read_ignored_docs(self):
@@ -172,6 +172,191 @@ class FenceTests(unittest.TestCase):
 
             warnings = [line for line in result.stdout.splitlines() if line.startswith("WARN")]
             self.assertEqual(warnings, ["WARN  broken link in README.md: gone.md"])
+
+
+class StagedTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md", "docs/goal.md"]},
+            "files": {
+                "README.md": {"sections": ["# "]},
+                "docs/goal.md": {"sections": ["## Goal"]},
+            },
+        }))
+        self.write(".gitignore", "docs/\n")
+        self.write("README.md", "# Project\n")
+        self.git("init")
+        self.git("add", "README.md", ".gitignore", "checks.json")
+
+    def git(self, *args):
+        result = subprocess.run(
+            ["git", *args], cwd=str(self.root), capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def test_index_wins_over_gitignore_for_tracked_files(self):
+        self.write("docs/goal.md", "## Goal\n")
+        self.git("add", "-f", "docs/goal.md")
+
+        staged = self.check_project("--staged")
+        self.assertEqual(staged.returncode, 0, staged.stdout + staged.stderr)
+        self.assertNotIn("skip  local-only", staged.stdout)
+        self.assertIn("ok    sections: docs/goal.md", staged.stdout)
+
+        published = self.check_project("--published")
+        self.assertIn("skip  local-only (not published): docs/goal.md", published.stdout)
+
+    def test_untracked_files_are_reported_but_not_checked(self):
+        self.write("notes.md", "[gone](missing.md)\n")
+
+        result = self.check_project("--staged")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("skip  untracked (not in git index): 1 file(s) (notes.md)", result.stdout)
+        self.assertNotIn("missing.md", result.stdout)
+
+    def test_worktree_changes_are_announced(self):
+        self.write("README.md", "# Project\n\nlocal edit\n")
+
+        result = self.check_project("--staged")
+
+        self.assertIn("note  worktree differs from git index for 1 file(s)", result.stdout)
+
+    def test_staged_requires_a_git_work_tree(self):
+        plain = self.root / "plain"
+        plain.mkdir()
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(plain), "-config", str(self.config), "--staged"],
+            capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("error: --staged needs a git work tree", result.stderr)
+
+    def test_published_and_staged_are_mutually_exclusive(self):
+        result = self.check_project("--published", "--staged")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("mutually exclusive", result.stderr)
+
+
+class SecretScanTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md"]},
+            "files": {"README.md": {"sections": ["# "]}},
+            "secrets": {
+                "enabled": True,
+                "rules": [
+                    {"name": "github-token", "pattern": "gh[pousr]_[A-Za-z0-9]{20,}"},
+                    {"name": "assigned-credential",
+                     "pattern": "(?i)(?:token|password)\\s*[:=]\\s*[\"']?([A-Za-z0-9_\\-]{12,})",
+                     "valueGroup": 1},
+                ],
+                "allow": "(?i)x{3,}|<[^>]*>|your[_-][A-Za-z0-9_-]*|placeholder|example",
+            },
+        }))
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def warnings(self, output):
+        return [line for line in output.splitlines() if line.startswith("WARN")]
+
+    def test_reports_location_and_rule_only(self):
+        token = "ghp_" + "a" * 24
+        self.write("README.md", "# Project\n\ntoken: " + token + "\n")
+
+        result = self.check_project()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.warnings(result.stdout),
+            ["WARN  possible secret (github-token) at README.md:3",
+             "WARN  possible secret (assigned-credential) at README.md:3"],
+        )
+        self.assertNotIn(token, result.stdout)
+        self.assertIn("not exhaustive", result.stdout)
+
+    def test_placeholders_are_allowed(self):
+        self.write("README.md", "# Project\n\ntoken: ghp_" + "x" * 24 + "\npassword: <your-password>\n")
+
+        result = self.check_project()
+
+        self.assertEqual(self.warnings(result.stdout), [], result.stdout)
+        self.assertIn("ok    no obvious secrets", result.stdout)
+
+    def test_strict_turns_secrets_into_failures(self):
+        self.write("README.md", "# Project\n\ntoken: ghp_" + "a" * 24 + "\n")
+
+        result = self.check_project("--strict")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("FAIL  possible secret (github-token) at README.md:3", result.stdout)
+
+
+class ConfigExtendsTests(unittest.TestCase):
+    def test_child_config_overrides_only_its_own_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "base.json").write_text(json.dumps({
+                "stages": {"founding": ["README.md"]},
+                "files": {"README.md": {"sections": ["# "], "maxLines": 5}},
+            }), encoding="utf-8")
+            child = root / "child.json"
+            child.write_text(json.dumps({"extends": "base.json", "files": {"README.md": {"maxLines": 50}}}), encoding="utf-8")
+            (root / "README.md").write_text("# Project\n" + "line\n" * 20, encoding="utf-8")
+
+            args = [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(child)]
+            relaxed = subprocess.run(args, capture_output=True, encoding="utf-8")
+            self.assertEqual(relaxed.returncode, 0, relaxed.stdout + relaxed.stderr)
+            self.assertNotIn("WARN", relaxed.stdout)
+            self.assertIn("ok    sections: README.md", relaxed.stdout)
+
+            base = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(root / "base.json")],
+                capture_output=True, encoding="utf-8",
+            )
+            self.assertIn("WARN  length 21/5 lines in README.md", base.stdout)
+
+    def test_extends_loop_is_a_config_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "a.json").write_text(json.dumps({"extends": "b.json"}), encoding="utf-8")
+            (root / "b.json").write_text(json.dumps({"extends": "a.json"}), encoding="utf-8")
+            (root / "README.md").write_text("# Project\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(root / "a.json")],
+                capture_output=True, encoding="utf-8",
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("error: config extends loop", result.stderr)
 
 
 if __name__ == "__main__":

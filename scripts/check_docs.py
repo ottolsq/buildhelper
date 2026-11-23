@@ -20,7 +20,9 @@ Runs on Windows, macOS and Linux with the Python 3.8+ standard library only.
 import argparse
 import fnmatch
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -71,11 +73,43 @@ def read_text(path):
     return data.decode("latin-1", errors="replace")
 
 
-def load_rules(config_path):
+def load_config_file(config_path, seen=None):
+    """Read a config, merging ``extends`` so a project can override only what differs."""
+    path = Path(config_path).resolve()
+    seen = set(seen or ())
+    if path in seen:
+        raise ConfigError("config extends loop at {0}".format(path))
+    seen.add(path)
     try:
-        settings = json.loads(read_text(config_path))
+        settings = json.loads(read_text(path))
     except (json.JSONDecodeError, ValueError) as exc:
-        raise ConfigError("invalid JSON in {0}: {1}".format(config_path, exc))
+        raise ConfigError("invalid JSON in {0}: {1}".format(path, exc))
+    if not isinstance(settings, dict):
+        raise ConfigError("config must be a JSON object: " + str(path))
+
+    base = settings.get("extends")
+    if not base:
+        return settings
+    base_path = (path.parent / base).resolve()
+    if not base_path.is_file():
+        raise ConfigError("config extends missing file: {0} (from {1})".format(base_path, path))
+    parent = load_config_file(base_path, seen)
+    merged = dict(parent)
+    for key, value in settings.items():
+        if key != "extends":
+            merged[key] = value
+    base_files = dict(parent.get("files") or {})
+    for name, rule in (settings.get("files") or {}).items():
+        combined = dict(base_files.get(name) or {})
+        combined.update(rule or {})
+        base_files[name] = combined
+    if "files" in settings:
+        merged["files"] = base_files
+    return merged
+
+
+def load_rules(config_path):
+    settings = load_config_file(config_path)
 
     stages = settings.get("stages")
     files = settings.get("files")
@@ -167,6 +201,65 @@ def mask_fenced(text):
             continue
         out.append(line)
     return "".join(out)
+
+
+def repo_location(root):
+    """Return (repository top, ``root`` prefix inside it) for the git work tree."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    except (OSError, ValueError):
+        raise ConfigError("--staged needs git on PATH: rev-parse --show-toplevel failed")
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise ConfigError("--staged needs a git work tree at {0}: {1}".format(
+            root, detail[-1] if detail else result.returncode))
+    top = Path(result.stdout.decode("utf-8", "replace").strip()).resolve()
+    here = Path(root).resolve()
+    if os.path.normcase(str(top)) == os.path.normcase(str(here)):
+        return top, ""
+    prefix = os.path.relpath(str(here), str(top))
+    if prefix.startswith(".."):
+        raise ConfigError("-root is not inside its git work tree: {0}".format(root))
+    return top, prefix.replace("\\", "/")
+
+
+def git_paths(top, args, what, prefix=""):
+    """Run a command at the repository top and keep only paths under ``prefix``."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(top)] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    except (OSError, ValueError):
+        raise ConfigError("--staged needs git on PATH: " + what)
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise ConfigError("--staged git {0}: {1}".format(what, detail[-1] if detail else result.returncode))
+    paths = []
+    for item in result.stdout.split(b"\0"):
+        if not item:
+            continue
+        path = item.decode("utf-8", "replace").replace("\\", "/")
+        if prefix:
+            if not path.startswith(prefix + "/"):
+                continue
+            path = path[len(prefix) + 1:]
+        paths.append(path)
+    return paths
+
+
+def index_paths(root):
+    """Files in the git index: what a commit made now would contain."""
+    top, prefix = repo_location(root)
+    return set(git_paths(top, ["ls-files", "-z"], "ls-files failed", prefix=prefix))
+
+
+def worktree_changes(root):
+    """Tracked files whose worktree content differs from the index."""
+    top, prefix = repo_location(root)
+    return sorted(git_paths(top, ["diff", "--name-only", "-z"], "diff failed", prefix=prefix))
 
 
 def under_roots(relative_posix, roots):
@@ -276,10 +369,11 @@ def warn_if_container(root, report):
         )
 
 
-def check_links(root, files, ignore_rules, report):
+def check_links(root, files, report, unpublished=None, label="ignored path", clean_message="no published file links into ignored paths"):
     broken = 0
-    unpublished = 0
+    leaked = 0
     for path in files:
+        source_rel = relative(path, root)
         for target in LINK_RE.findall(mask_fenced(read_text(path))):
             target = target.strip()
             if not target or SCHEME_RE.match(target):
@@ -292,28 +386,31 @@ def check_links(root, files, ignore_rules, report):
             candidate = path.parent / clean
             if not candidate.exists():
                 broken += 1
-                report.warn("broken link in {0}: {1}".format(relative(path, root), target))
+                report.warn("broken link in {0}: {1}".format(source_rel, target))
                 continue
             try:
                 target_rel = candidate.resolve().relative_to(root).as_posix()
             except (ValueError, OSError):
                 continue
-            if is_ignored(target_rel, ignore_rules) and not is_ignored(relative(path, root), ignore_rules):
-                unpublished += 1
-                report.warn("published file {0} links to ignored path: {1}".format(relative(path, root), target))
+            if unpublished is not None and unpublished(source_rel, target_rel):
+                leaked += 1
+                report.warn("published file {0} links to {1}: {2}".format(source_rel, label, target))
     if broken == 0:
         report.ok("relative links resolve")
-    if unpublished == 0:
-        report.ok("no published file links into ignored paths")
+    if leaked == 0:
+        report.ok(clean_message)
 
 
-def check_adr(root, ignore_rules, report):
+def check_adr(root, ignore_rules, report, tracked=None):
     adr_dir = root / "docs" / "adr"
     if not adr_dir.is_dir():
         return
     seen = {}
     for path in sorted(adr_dir.glob("*.md")):
-        if is_ignored(path.relative_to(root).as_posix(), ignore_rules):
+        rel = path.relative_to(root).as_posix()
+        if tracked is not None and rel not in tracked:
+            continue
+        if is_ignored(rel, ignore_rules):
             continue
         match = ADR_NAME_RE.match(path.name)
         if not match:
@@ -333,7 +430,7 @@ def check_adr(root, ignore_rules, report):
         report.ok("adr numbering contiguous: {0} file(s)".format(len(seen)))
 
 
-def check_placeholders(files, settings, strict, report):
+def check_placeholders(root, files, settings, strict, report):
     marker = settings.get("placeholderMarker") or "<!-- fill"
     hits = 0
     for path in files:
@@ -358,6 +455,58 @@ def relative(path, root):
         return str(path)
 
 
+def load_secret_rules(settings):
+    section = settings.get("secrets") or {}
+    if not section.get("enabled", True):
+        return [], None
+    allow = section.get("allow") or ""
+    allow_re = None
+    if allow:
+        try:
+            allow_re = re.compile(allow)
+        except re.error as exc:
+            raise ConfigError("invalid secrets allow pattern: {0}".format(exc))
+    rules = []
+    for item in section.get("rules") or []:
+        pattern = item.get("pattern")
+        name = item.get("name") or "secret"
+        if not pattern:
+            continue
+        try:
+            regex = re.compile(pattern)
+        except re.error as exc:
+            raise ConfigError("invalid secrets rule {0!r}: {1}".format(name, exc))
+        group = int(item.get("valueGroup", 0) or 0)
+        if group > (regex.groups or 0):
+            group = 0
+        rules.append((name, regex, group))
+    return rules, allow_re
+
+
+def check_secrets(root, files, rules, allow_re, strict, report):
+    """Report the location and rule name only; never echo the matched value."""
+    if not rules:
+        return
+    hits = 0
+    for path in files:
+        source_rel = relative(path, root)
+        for number, line in enumerate(read_text(path).splitlines(), 1):
+            for name, regex, group in rules:
+                for match in regex.finditer(line):
+                    value = match.group(group) if group else match.group(0)
+                    if allow_re is not None and allow_re.search(value):
+                        continue
+                    hits += 1
+                    message = "possible secret ({0}) at {1}:{2}".format(name, source_rel, number)
+                    if strict:
+                        report.fail(message)
+                    else:
+                        report.warn(message)
+    if hits == 0:
+        report.ok("no obvious secrets")
+    print("note  secret scan: patterns only; git history and untracked files are not scanned; not exhaustive")
+
+
 def run(args):
     root = Path(args.root).expanduser().resolve()
     if not root.is_dir():
@@ -366,11 +515,16 @@ def run(args):
     config = Path(args.config).expanduser().resolve() if args.config else Path(__file__).resolve().parent.parent / "references" / "checks.json"
     if not config.is_file():
         raise ConfigError("config not found: " + str(config))
+    if args.published and args.staged:
+        raise ConfigError("--published and --staged are mutually exclusive")
 
     settings, stages, files = load_rules(config)
     all_names = required_files(stages, args.stage)
     material_root = Path(__file__).resolve().parent.parent / "references"
     ignore_rules = load_gitignore(root)
+    index = index_paths(root) if args.staged else None
+
+    print("config " + str(config))
 
     names = all_names
     scan_ignored_roots = sorted({name.split("/")[0] for name in all_names if "/" in name and is_ignored(name, ignore_rules)})
@@ -380,25 +534,64 @@ def run(args):
         scan_ignored_roots = ()
         if skipped:
             print("skip  local-only (not published): " + ", ".join(skipped))
+    elif args.staged:
+        skipped = [name for name in all_names if name not in index]
+        names = [name for name in all_names if name in index]
+        scan_ignored_roots = ()
+        if skipped:
+            print("skip  local-only (not in git index): " + ", ".join(skipped))
 
-    markdown, ignored_paths = collect_markdown(root, material_root, ignore_rules, scan_ignored_roots)
+    if index is not None:
+        # The index decides what ships: tracked-but-ignored files are included,
+        # untracked files are not, whatever .gitignore says.
+        markdown, _ = collect_markdown(root, material_root, (), ())
+        untracked = [relative(path, root) for path in markdown if relative(path, root) not in index]
+        markdown = [path for path in markdown if relative(path, root) in index]
+        if untracked:
+            sample = ", ".join(untracked[:3]) + (", ..." if len(untracked) > 3 else "")
+            print("skip  untracked (not in git index): {0} file(s) ({1})".format(len(untracked), sample))
+        changed = worktree_changes(root)
+        if changed:
+            sample = ", ".join(changed[:3]) + (", ..." if len(changed) > 3 else "")
+            print("note  worktree differs from git index for {0} file(s); checked content is the worktree ({1})".format(len(changed), sample))
+        unpublished = lambda source, target: target not in index
+        label = "unindexed path"
+        clean_message = "no published file links into unindexed paths"
+        skipped_paths = len(untracked)
+    else:
+        markdown, ignored_paths = collect_markdown(root, material_root, ignore_rules, scan_ignored_roots)
+        if ignored_paths:
+            sample = ", ".join(ignored_paths[:3]) + (", ..." if len(ignored_paths) > 3 else "")
+            print("skip  gitignored (not scanned): {0} path(s) ({1})".format(len(ignored_paths), sample))
+        unpublished = lambda source, target: is_ignored(target, ignore_rules) and not is_ignored(source, ignore_rules)
+        label = "ignored path"
+        clean_message = "no published file links into ignored paths"
+        skipped_paths = len(ignored_paths)
 
     report = Report()
     check_required(root, files, names, report)
-    check_links(root, markdown, ignore_rules, report)
-    check_adr(root, ignore_rules if args.published else (), report)
-    check_placeholders(markdown, settings, args.strict, report)
+    check_links(root, markdown, report, unpublished, label, clean_message)
+    check_adr(root, ignore_rules if args.published else (), report, tracked=index)
+    check_placeholders(root, markdown, settings, args.strict, report)
+    secret_rules, secret_allow = load_secret_rules(settings)
+    check_secrets(root, markdown, secret_rules, secret_allow, args.strict, report)
     warn_if_container(root, report)
 
     scope = "{0} markdown file(s) scanned".format(len(markdown))
+    if args.staged:
+        scope += " from the git index"
     if scan_ignored_roots:
         scope += "; local doc set still read: " + ", ".join(scan_ignored_roots)
-    if ignored_paths:
-        sample = ", ".join(ignored_paths[:3]) + (", ..." if len(ignored_paths) > 3 else "")
-        scope += "; {0} gitignored path(s) skipped ({1})".format(len(ignored_paths), sample)
+    if skipped_paths:
+        scope += "; {0} path(s) skipped".format(skipped_paths)
     print("scan  " + scope)
     print("")
-    suffix = ", published only" if args.published else ""
+    modes = []
+    if args.published:
+        modes.append("published only")
+    if args.staged:
+        modes.append("git index only")
+    suffix = ", " + ", ".join(modes) if modes else ""
     print("{0} failure(s), {1} warning(s) under {2} (stage: {3}{4})".format(report.failures, report.warnings, root, args.stage, suffix))
     return EXIT_FINDINGS if report.failures else EXIT_OK
 
@@ -409,7 +602,8 @@ def main(argv=None):
     parser.add_argument("-config", "--config", default=None, help="path to checks.json (default: ../references/checks.json)")
     parser.add_argument("-stage", "--stage", default="founding", help="founding (default) / milestone / release; stages are cumulative")
     parser.add_argument("-published", "--published", action="store_true", help="check only files that a clone would receive (skips gitignored ones)")
-    parser.add_argument("-strict", "--strict", action="store_true", help="treat unfilled placeholders as failures")
+    parser.add_argument("-staged", "--staged", action="store_true", help="check exactly what the git index would commit (needs a git work tree)")
+    parser.add_argument("-strict", "--strict", action="store_true", help="treat unfilled placeholders and possible secrets as failures")
     args = parser.parse_args(argv)
 
     try:
