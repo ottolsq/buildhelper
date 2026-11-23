@@ -560,7 +560,9 @@ def run(args):
         skipped_paths = len(untracked)
     else:
         markdown, ignored_paths = collect_markdown(root, material_root, ignore_rules, scan_ignored_roots)
-        if ignored_paths:
+        # Only the local mode lists ignored paths: otherwise --published would
+        # echo every local-only file back at someone checking a release.
+        if ignored_paths and not args.published:
             sample = ", ".join(ignored_paths[:3]) + (", ..." if len(ignored_paths) > 3 else "")
             print("skip  gitignored (not scanned): {0} path(s) ({1})".format(len(ignored_paths), sample))
         unpublished = lambda source, target: is_ignored(target, ignore_rules) and not is_ignored(source, ignore_rules)

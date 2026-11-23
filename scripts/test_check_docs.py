@@ -239,12 +239,14 @@ class StagedTests(unittest.TestCase):
         self.assertIn("note  worktree differs from git index for 1 file(s)", result.stdout)
 
     def test_staged_requires_a_git_work_tree(self):
-        plain = self.root / "plain"
-        plain.mkdir()
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT), "-root", str(plain), "-config", str(self.config), "--staged"],
-            capture_output=True, encoding="utf-8",
-        )
+        # A subdirectory of a repo *is* inside its work tree, so use a plain
+        # directory outside it to stand for "no repository here".
+        with tempfile.TemporaryDirectory() as directory:
+            plain = Path(directory)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(plain), "-config", str(self.config), "--staged"],
+                capture_output=True, encoding="utf-8",
+            )
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("error: --staged needs a git work tree", result.stderr)
 

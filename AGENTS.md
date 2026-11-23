@@ -33,6 +33,7 @@ python scripts\check_docs.py -root . -config references\checks-stock.json
 - 沙箱内 `git clone <本地路径>` 会失败（msys sh 起不来，`0xC0000022`）；要检查提交内容就用 `git archive` 导出，真实 clone 留给沙箱外的终端（2026-11-21 实测）
 - 单元测试 `python scripts/test_check_docs.py` 在本机沙箱内必定失败，原因不是测试写错：`tempfile` 用 `os.mkdir(..., 0o700)` 建目录，沙箱令牌随后无法列举该目录（`PermissionError: [WinError 5]`，实测 `os.mkdir(r'temp\m700', 0o700)` 后 `os.listdir` 立即失败，`0o777` 正常）；另外 git 对象文件是只读的，`shutil.rmtree` 删不掉。它由 CI 运行，本地不要据此判断测试坏了（2026-11-23 实测）
 - 本地验证校验器行为用 `python temp\verify_batch2.py`：它用 `os.makedirs` 建夹具、直接驱动 CLI，覆盖 `--staged` / 凭据 / `extends` / 存量配置，结果应与 CI 的单元测试一致
+- 确实要在本机跑整套 unittest 时用本机临时包装（不入库）：`temp\run_unittest.py` 把 `tempfile.TemporaryDirectory` 换成 `%TEMP%` 下 0o777 目录，并把夹具放在仓库外（否则 `--staged` 的「非 Git 仓库」用例会被仓库本身命中）；17 个用例实测 OK（2026-11-23）
 - 项目根：`C:\Users\ottol\myproject\buildhelper`（git 仓库）
 - 仓库根即 skill 根（ADR-004）：`SKILL.md`、`references/`、`scripts/` 直接在根；装到 `.dsh/skills/` 或跨工具的 `.agents/skills/`，本机尚未安装到任何 agent
 - 文档写入白名单：`README.md`、`CHANGELOG.md`、`AGENTS.md`、`SKILL.md`、`docs/**`、`references/**`、`scripts/**`
