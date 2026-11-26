@@ -1,5 +1,7 @@
 # AGENTS.md — buildhelper
 
+本文件供维护 buildhelper 仓库的 agent 使用。调用此 skill 时读取 `SKILL.md`，下游项目的指令范本在 `references/templates/AGENTS.template.md`。
+
 ## 命令
 
 ```powershell
@@ -13,7 +15,8 @@ python scripts\check_docs.py -root . -config references\checks-stock.json
 # 只读盘点：每份文档的角色与 keep/merge/archive 建议，不改文件
 python scripts\check_docs.py -root . -stage release --inventory
 # 反例：空目录 founding 应 exit 1；release 缺 CHANGELOG 应 exit 1；未知阶段应 exit 2；--published 与 --staged 同给应 exit 2
-# 单元测试只能在 CI 跑；本地想验证行为用 python temp\verify_batch2.py（见环境事实）
+# 运行校验器单元测试（需要 Python 和 Git）
+python scripts\test_check_docs.py
 ```
 
 ## 禁止事项
@@ -28,23 +31,17 @@ python scripts\check_docs.py -root . -stage release --inventory
 - 不要提交 `docs/` 下任何文件：整个文档集都是本地过程记录，`.gitignore` 已挡（ADR-007）
 - 不要让脚本自动移动或删除文档：`--inventory` 只出建议，收敛动作必须由用户确认（ADR-008）
 
-## 环境事实
+## 仓库结构与运行要求
 
-- Windows 11 + PowerShell 5.1；有 `python`（3.15）和 `git`，没有 `pnpm`，没有 `rg`
-- 校验脚本是 Python：`python scripts\check_docs.py -root .`；`.ps1` 已删除，不要再写 `powershell -File`
-- `Get-Content` 默认按 ANSI 解码，读 UTF-8 中文会乱码（行数也会数错）；读文件必须带 `-Encoding UTF8`
-- 沙箱内 `git clone <本地路径>` 会失败（msys sh 起不来，`0xC0000022`）；要检查提交内容就用 `git archive` 导出，真实 clone 留给沙箱外的终端（2026-11-21 实测）
-- 单元测试 `python scripts/test_check_docs.py` 在本机沙箱内必定失败，原因不是测试写错：`tempfile` 用 `os.mkdir(..., 0o700)` 建目录，沙箱令牌随后无法列举该目录（`PermissionError: [WinError 5]`，实测 `os.mkdir(r'temp\m700', 0o700)` 后 `os.listdir` 立即失败，`0o777` 正常）；另外 git 对象文件是只读的，`shutil.rmtree` 删不掉。它由 CI 运行，本地不要据此判断测试坏了（2026-11-23 实测）
-- 本地验证校验器行为用 `python temp\verify_batch2.py`：它用 `os.makedirs` 建夹具、直接驱动 CLI，覆盖 `--staged` / 凭据 / `extends` / 存量配置，结果应与 CI 的单元测试一致
-- 确实要在本机跑整套 unittest 时用本机临时包装（不入库）：`temp\run_unittest.py` 把 `tempfile.TemporaryDirectory` 换成 `%TEMP%` 下 0o777 目录，并把夹具放在仓库外（否则 `--staged` 的「非 Git 仓库」用例会被仓库本身命中）；24 个用例实测 OK（2026-11-23）
-- 项目根：`C:\Users\ottol\myproject\buildhelper`（git 仓库）
-- 仓库根即 skill 根（ADR-004）：`SKILL.md`、`references/`、`scripts/` 直接在根；装到 `.dsh/skills/` 或跨工具的 `.agents/skills/`，本机尚未安装到任何 agent
-- 文档写入白名单：`README.md`、`CHANGELOG.md`、`AGENTS.md`、`SKILL.md`、`docs/**`、`references/**`、`scripts/**`
+- 仓库根即 skill 根（ADR-004）。入口为 `SKILL.md`，模板和规则在 `references/`，校验器和测试在 `scripts/`。
+- 校验器使用 Python 3.8+ 标准库。索引模式需要 Git。PowerShell 读取中文文档时显式指定 UTF-8。
+- 文档写入白名单：`README.md`、`CHANGELOG.md`、`AGENTS.md`、`SKILL.md`、`docs/**`、`references/**`、`scripts/**`。
+- 提交前逐项检查 `git diff --cached`。文档示例使用仓库相对路径或占位符。机器标识、个人目录、工具安装状态和原始日志留在本地（2026-11-26 文档审查）。
 
 ## 完成定义
 
 - 改 `SKILL.md`、模板、`checks.json` 或 `check_docs.py` 后，必须跑三档 `-stage` 并贴实际输出：正常 `0`、空目录 `1`、坏配置或未知阶段 `2`
-- 改校验器后还要跑 `--published`、`--staged`、`--strict`、`--inventory` 与 `-config references\checks-stock.json`，再加 `python temp\verify_batch2.py` 应全 PASS
+- 改校验器后还要跑 `--published`、`--staged`、`--strict`、`--inventory` 与 `-config references\checks-stock.json`，并核对单元测试结果。受限环境的已知问题和替代验证见本地 `docs/test-records.md`
 - 新增检查项时同时给正例（应 0 FAIL）和反例（应非 0）
 - 文档与实现不一致时先改文档
 

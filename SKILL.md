@@ -6,7 +6,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 # 项目文档建设与维护
 
-把「什么时候需要哪份文档」变成可执行的流程。默认输出中文，代码、命令、标识符、提交信息用英文。
+阅读本 skill 的 agent 协助用户约定项目文档和工作方式。维护本 skill 仓库的指令在根 `AGENTS.md`；为下游项目编写指令时，使用 `references/templates/AGENTS.template.md`。下游 `AGENTS.md` 默认入库，由用户按项目维护。默认输出中文，代码、命令、标识符、提交信息用英文。
 
 ## 何时用
 
@@ -23,9 +23,9 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 ## 三条硬规则
 
-1. **只补缺，不重写。** 已存在的文件一律先读；已有段落只做校准，不整篇覆盖；结构性改动先给出 diff 摘要并等确认。唯一例外是用户明确要求的「存量整理」（见下节）。
+1. **只补缺，不重写。** 已存在的文件一律先读；已有段落只做校准。项目约定与模板不同时，先指出具体差异、对实际工作的影响，让用户取舍，保留用户已有的修改；结构性改动先给出 diff 摘要并等确认。唯一例外是用户明确要求的「存量整理」（见下节）。
 2. **写盘白名单。** 只允许写 `README.md`、`CHANGELOG.md`、`AGENTS.md`、`docs/**`。不碰源码、CI 配置、`.git`、依赖清单。
-3. **信息不足就问，不编。** 目标、用户、完成标准探测不出来时，停在第 2 步用一次 `ask_user_question` 收集；不允许生成占位式假目标然后把流程走完。
+3. **信息不足就问，不编。** 目标、用户、完成标准探测不出来时，从尚不清楚且会影响当前工作的事项中选一个询问用户；不允许生成占位式假目标然后把流程走完。
 
 ## 阶段门与产出
 
@@ -55,28 +55,28 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 1. **探测（只读）** — 见下节；先看清项目是什么，再决定写什么。
 2. **盘点** — 列出「已有 / 缺失 / 过期」三列，不要边盘点边写。
-3. **询问** — 只问三件事：一句话目标、谁用、本期做到哪算完成。
+3. **询问** — 从现有资料确认目标用户、最终期待的使用效果和本期验收条件。只就影响当前决定的缺口逐项询问。
 4. **生成** — 只写缺失项；从 `references/templates/` 复制，替换掉所有 `<!-- fill -->`。
 5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
-6. **自检** — 运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。准备提交时再加 `--staged`，校验的是「这次提交真正会包含的文档」，与本地全量校验互补。
+6. **自检** — 新建或调整文档骨架、阶段交付或审计时，运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。文档入库时可加 `--staged` 辅助检查。它按索引选文件、读取工作区文本，最终用 `git diff --cached` 审阅实际暂存的内容。日常纯代码改动若未改变文档所述行为、命令或约定，运行对应代码测试即可。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
 
 ## 一份文档只有一个家
 
-文档乱的根因不是数量，是同一件事有几份文档。新建文件之前先查这张表；表里没有归属的先问，默认不建。
+文档乱的根因不是数量，是同一件事有几份文档。新建文件之前先查这张表；表里没有归属的先问，默认不建。下表用于下游项目，`docs/` 选择性入库。buildhelper 自身的 `docs/` 是维护过程记录，只留本地。
 
 | 内容 | 唯一位置 | 入库 |
 |---|---|---|
 | 入口、安装、许可 | `README.md`、`INSTALL.md`、`LICENSE` | 是 |
 | agent 约束 | `AGENTS.md` | 是 |
 | 版本变化 | `CHANGELOG.md` | 是 |
-| 目标与非目标 | `docs/goal.md` | 否 |
-| 架构、模块边界 | `docs/architecture.md`（模块多才拆 `docs/modules/`） | 否 |
-| 里程碑与 DoD | `docs/plan.md` | 否 |
-| 决策与理由 | `docs/adr/NNN-*.md` | 否 |
-| 对外接口契约 | `docs/api/` | 对外才推 |
-| 验收与缺陷 | `docs/test-records.md` | 否 |
-| 阶段结论、复盘 | `docs/history/`、`docs/postmortems/` | 否 |
+| 目标与非目标 | `docs/goal.md` | 已确认、可共享的目标 |
+| 架构、模块边界 | `docs/architecture.md`（模块多才拆 `docs/modules/`） | 已确认、可共享的边界 |
+| 里程碑与 DoD | `docs/plan.md` | 已确认的共享路线与验收条件 |
+| 决策与理由 | `docs/adr/NNN-*.md` | 已采纳、可共享的决定及理由 |
+| 对外接口契约 | `docs/api/` | 可向仓库读者公开的契约 |
+| 验收与缺陷 | `docs/test-records.md` | 脱敏后的实测结论与复现方法 |
+| 阶段结论、复盘 | `docs/history/`、`docs/postmortems/` | 可共享的结论。原始日志、设备信息和未公开材料留在本地 |
 
 三条推论：
 
@@ -101,7 +101,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 - 清单文件：`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml`、`*.csproj`
 - 命令来源：清单里的 `scripts`、`Makefile`、`justfile`、CI 配置
 - 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`
-- 写入边界：先看目标项目的 `.gitignore`。它可能已经忽略 `docs/` 或 `AGENTS.md`，那本次产物不会入库，必须在报告里点明（2026-11-22 ctrip 实测：`docs/` 被忽略，只有根级 `AGENTS.md` 可提交）
+- 写入边界：核对目标项目的 `.gitignore` 和 Git 已跟踪文件。若既有规则会排除原本要共享的文档，说明影响，请用户取舍。
 - 事实来源：所有命令从上述文件抄，不凭印象写；查不到就标「未验证」
 
 ## 每份文档的最低要求
@@ -115,7 +115,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 | `docs/plan.md` | 本期目标、粗粒度任务、DoD、风险、验收方式 |
 | `docs/history/NN-*.md` | 达成情况、未完成及原因、风险、下阶段 |
 | `docs/test-records.md` | 验收结论、已知缺陷与复现、证据位置 |
-| `AGENTS.md` | 命令、禁止项、环境事实、完成定义 |
+| `AGENTS.md` | 简明协作约定、可复现的命令和运行要求、实际模块边界、禁止事项、验收及本地提交方式 |
 
 长度上限不写在这里：`references/checks.json` 的 `maxLines` 是唯一事实源，超限报 WARN 但不阻断。
 
@@ -177,7 +177,7 @@ python scripts/check_docs.py -root . -config references/checks-stock.json
 
 ## 资源
 
-- `references/templates/` — 9 份模板，按阶段门取用。模板一律用 `<名字>.template.md` 命名：`AGENTS.md` 在 Windows 上大小写不敏感，`agents.md` 会被当成真指令注入会话
+- `references/templates/` — 9 份模板，按阶段门取用。指令模板使用 `AGENTS.template.md`，防止被误读为当前生效的 `AGENTS.md`
 - `references/checklist.md` — 交付前逐条勾
 - `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限、凭据规则
 - `references/checks-stock.json` — 存量项目起点配置：`extends` 基础规则，只放宽长度
