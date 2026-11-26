@@ -49,7 +49,16 @@ git -C <project>/.agents/skills/project-docs pull   # update to latest
 git clone --branch <tag> <repo> ...                 # pin (meaningful once tags exist)
 ```
 
-## Two gotchas
+## Repository boundaries
+
+For a local checkout created by the clone command above, add this one line to the target project's root `.gitignore`. Adjust the path if you chose a different installation directory.
+
+```gitignore
+/.agents/skills/project-docs/
+```
+
+A user-level installation lives outside the project and requires no project ignore entry. To pin a shared project installation in Git, use a submodule. The target project keeps its own rules for `docs/`, configuration and `AGENTS.md`. See [Repository boundaries](README.md#repository-boundaries).
+
+## Skill discovery
 
 - The directory name must match the frontmatter `name` (`project-docs`). Two same-name bundles under one skill root collide; rank or scan order decides which one wins.
-- Add the directory to the project's `.gitignore`, or the project gains a nested `.git` repository. If it must be versioned, use a submodule — do not commit it directly.

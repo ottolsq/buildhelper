@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-把「一个项目该有哪些文档、什么时候写、怎么不烂」变成 agent 能直接执行的流程。不是文档生成器，而是一层约束：什么时候该产出什么、只补缺不重写、写完怎么校验。当前 0.3.0：克隆即可用。
+buildhelper 帮你和编码 agent 约定项目目标、文档和工作方式。立项时先写清最终想看到的效果，每个阶段再选一段能实际试用的流程，写清怎样验证、哪些改动可以一起提交。已有项目从现有文档开始，只补缺项。
 
 ## 安装
 
@@ -19,10 +19,14 @@ git clone <repo-url> .agents/skills/project-docs
 ```
 SKILL.md                    流程、阶段门、反模式
 references/                 checks.json、checks-stock.json、checklist、9 份模板
-scripts/check_docs.py       校验脚本（Python 3.8+，仅标准库）
-scripts/test_check_docs.py  校验脚本的单元测试
-docs/                       本项目文档（本地，不发布）
+scripts/                    校验器 check_docs.py 及其单元测试（Python 3.8+，仅标准库）
 ```
+
+## 仓库边界
+
+- 根目录的 [AGENTS.md](AGENTS.md) 供 buildhelper 维护者使用。下游项目保留已有协作约定，新建 `AGENTS.md` 时参考[下游项目模板](references/templates/AGENTS.template.md)。
+- buildhelper 的维护记录（`docs/`）、试验材料（`temp/`）和本机配置（`.env`、`.env.*`）留在本地。只含占位值的 `.env.example` 可以共享。
+- 下游项目沿用自己的 `.gitignore`，从 `docs/` 中选择要共享的目标、计划和设计决定。若仅供本机使用，只忽略 skill 的具体安装目录，示例见[安装说明](INSTALL.zh-CN.md)。
 
 ## 校验
 
@@ -32,9 +36,5 @@ docs/                       本项目文档（本地，不发布）
 - 存量项目：`-config references/checks-stock.json` 只放宽长度上限
 - 一份文档只有一个家：`--inventory` 列出每份文档的角色与 keep/merge/archive 建议；归属规则与 `docs/` 预算在 `references/checks.json`
 - 阶段累计（`founding` → `milestone` → `release`）；退出码 `0` 通过、`1` 有 FAIL、`2` 用法或配置错误。没有 Python 时按 `references/checklist.md` 人工核对。
-
-## 文档
-
-文档集（目标、架构、计划、ADR、阶段与测试记录）默认只留本地，不随仓库发布——这是设计，不是缺失（ADR-007）。安装与接入见 [接入方式](INSTALL.zh-CN.md)。
 
 许可：MIT（见 [LICENSE](LICENSE)）。

@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Turn "which documents a project needs, when to write them, and how to keep them from rotting" into a workflow an agent can execute. Not a document generator — a constraint layer: what to produce at which stage, fill gaps only, and validate what you wrote. Current: 0.3.0, clone and use.
+buildhelper helps you and your coding agent agree on a project's goals, documentation and working rules. At kickoff, record the intended outcome. For each milestone, describe one workflow someone can try, how to verify it, and which changes belong in the same commit. Start with the documents your project already has.
 
 ## Install
 
@@ -19,10 +19,14 @@ git clone <repo-url> .agents/skills/project-docs
 ```
 SKILL.md                     workflow, stage gates, anti-patterns
 references/                  checks.json, checks-stock.json, checklist, 9 templates
-scripts/check_docs.py        validator (Python 3.8+, stdlib only)
-scripts/test_check_docs.py   unit tests for the validator
-docs/                        this project's docs (local, not published)
+scripts/                     check_docs.py validator and its tests (Python 3.8+, stdlib only)
 ```
+
+## Repository boundaries
+
+- The root [AGENTS.md](AGENTS.md) guides buildhelper maintainers. Keep your project's existing instructions. When creating a new `AGENTS.md`, adapt the [project template](references/templates/AGENTS.template.md).
+- buildhelper keeps its development notes (`docs/`), trial runs (`temp/`) and local configuration (`.env`, `.env.*`) on the maintainer's machine. A placeholder-only `.env.example` can be shared.
+- Your project uses its own `.gitignore`. Choose which goals, plans and decisions to share in `docs/`. For a local skill installation inside the project, ignore just the installation directory as shown in the [installation guide](INSTALL.md).
 
 ## Validate
 
@@ -32,9 +36,5 @@ docs/                        this project's docs (local, not published)
 - Existing projects: `-config references/checks-stock.json` relaxes page-length limits only
 - One home per document: `--inventory` lists every file with a role and a keep/merge/archive proposal; `scopes` and the `docs/` budget live in `references/checks.json`
 - Stages accumulate (`founding`, `milestone`, `release`); exit `0` pass, `1` findings, `2` usage error. Without Python, use `references/checklist.md`.
-
-## Docs
-
-The doc set (goal, architecture, plan, ADRs, phase and test records) stays local by design and is not published — intentional, not missing (ADR-007). Install details in [INSTALL.md](INSTALL.md).
 
 License: MIT (see [LICENSE](LICENSE)).

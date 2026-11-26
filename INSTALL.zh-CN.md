@@ -49,7 +49,16 @@ git -C <项目>/.agents/skills/project-docs pull   # 更新到最新
 git clone --branch <tag> <repo> ...             # 锁版本（打了 tag 之后才有意义）
 ```
 
-## 两个坑
+## 仓库边界
+
+若按上面的克隆命令安装且仅供本机使用，在目标项目根目录的 `.gitignore` 里加下面这一行。若选了其他安装位置，按实际目录调整。
+
+```gitignore
+/.agents/skills/project-docs/
+```
+
+装在用户目录时，项目的忽略规则无需调整。团队要通过 Git 共享安装并固定版本时，可使用子模块。目标项目沿用自己对 `docs/`、配置文件和 `AGENTS.md` 的约定，详见 [README 的仓库边界](README.zh-CN.md#仓库边界)。
+
+## 技能识别
 
 - 目录名必须与 frontmatter 的 `name` 一致（`project-docs`）。同一 skill 根下两个同名目录会撞名，靠 rank 或扫描顺序决定谁生效。
-- 装进项目后把该目录写进 `.gitignore`，否则项目里会多一个嵌套 `.git` 仓库。想让它进版本库，就用 submodule，别直接提交。
