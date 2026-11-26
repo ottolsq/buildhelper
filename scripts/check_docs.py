@@ -128,7 +128,10 @@ def load_rules(config_path):
     stages = settings.get("stages")
     files = settings.get("files")
     if isinstance(files, dict) and files:
-        return settings, (stages or {"founding": sorted(files)}), files
+        if not stages:
+            required = [name for name, rule in files.items() if not (rule or {}).get("checkIfPresent")]
+            stages = {"founding": sorted(required)}
+        return settings, stages, files
 
     legacy = settings.get("requiredFiles")
     if isinstance(legacy, dict) and legacy:
@@ -657,6 +660,13 @@ def run(args):
     material_root = Path(__file__).resolve().parent.parent / "references"
     ignore_rules = load_gitignore(root)
     index = index_paths(root) if args.staged else None
+    for name, rule in files.items():
+        if name in all_names or not (rule or {}).get("checkIfPresent"):
+            continue
+        present = name in index if index is not None else (root / name).is_file()
+        if present:
+            all_names.append(name)
+
     inventory_index = index
     if args.inventory and inventory_index is None:
         try:

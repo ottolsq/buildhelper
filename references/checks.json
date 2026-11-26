@@ -1,14 +1,14 @@
 {
   "placeholderMarker": "<!-- fill",
   "stages": {
-    "founding": ["README.md", "docs/goal.md", "docs/architecture.md", "AGENTS.md"],
+    "founding": ["README.md", "docs/goal.md", "AGENTS.md"],
     "milestone": ["docs/plan.md"],
     "release": ["CHANGELOG.md"]
   },
   "files": {
     "README.md": { "sections": ["# "], "maxLines": 40 },
     "docs/goal.md": { "sections": ["## 目标", "## 非目标", "## 成功标准"], "maxLines": 60 },
-    "docs/architecture.md": { "sections": ["## 组件", "## 数据流"], "maxLines": 120 },
+    "docs/architecture.md": { "checkIfPresent": true, "sections": ["## 组件", "## 数据流"], "maxLines": 120 },
     "AGENTS.md": { "sections": ["## 命令", "## 禁止事项", "## 完成定义"], "maxLines": 100 },
     "docs/plan.md": { "sections": ["## 当前里程碑", "### 完成定义（DoD）", "### 风险"], "maxLines": 80 },
     "CHANGELOG.md": { "sections": ["## "], "maxLines": null }

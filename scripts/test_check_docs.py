@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("check_docs.py")
+BASE_RULES = SCRIPT.resolve().parents[1] / "references" / "checks.json"
 
 
 class RequiredHeadingTests(unittest.TestCase):
@@ -131,6 +132,49 @@ class ScanScopeTests(unittest.TestCase):
             capture_output=True, encoding="utf-8",
         )
 
+    def test_founding_checks_architecture_only_when_present(self):
+        self.config = BASE_RULES
+        self.write("docs/goal.md", "## 目标\n## 非目标\n## 成功标准\n")
+        self.write("AGENTS.md", "## 命令\n## 禁止事项\n## 完成定义\n")
+        self.write("docs/plan.md", "# Future milestone\n")
+        absent = self.check_project()
+        self.assertEqual(absent.returncode, 0, absent.stdout + absent.stderr)
+
+        self.write("docs/architecture.md", "## 组件\n")
+        invalid = self.check_project()
+        self.assertEqual(invalid.returncode, 1, invalid.stdout + invalid.stderr)
+        self.assertIn("missing section in docs/architecture.md: ## 数据流", invalid.stdout)
+        published = self.check_project("--published")
+        self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
+
+        self.write("docs/architecture.md", "## 组件\n## 数据流\n" + "note\n" * 119)
+        valid = self.check_project()
+        self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
+        self.assertIn("WARN  length 121/120 lines in docs/architecture.md", valid.stdout)
+
+    def test_config_without_stages_can_declare_an_optional_guide(self):
+        self.write("checks.json", json.dumps({"files": {
+            "README.md": {"sections": ["# "]},
+            "guide.md": {"checkIfPresent": True, "sections": ["## Usage"]},
+        }}))
+        absent = self.check_project()
+        self.assertEqual(absent.returncode, 0, absent.stdout + absent.stderr)
+        self.write("guide.md", "# Guide\n")
+        present = self.check_project()
+        self.assertEqual(present.returncode, 1, present.stdout + present.stderr)
+        self.assertIn("missing section in guide.md: ## Usage", present.stdout)
+
+    def test_project_can_require_architecture_at_a_later_stage(self):
+        self.write("checks.json", json.dumps({
+            "extends": str(BASE_RULES),
+            "stages": {"founding": ["README.md"], "milestone": ["docs/architecture.md"]},
+        }))
+        early = self.check_project()
+        self.assertEqual(early.returncode, 0, early.stdout + early.stderr)
+        required = self.check_project("-stage", "milestone")
+        self.assertEqual(required.returncode, 1, required.stdout + required.stderr)
+        self.assertIn("missing file: docs/architecture.md", required.stdout)
+
     def test_local_mode_reads_the_local_doc_set_and_skips_the_rest(self):
         self.write("docs/goal.md", "## Goal\n\n[gone](missing-doc.md)\n")
         self.write("study/note.md", "[noise](missing-study.md)\n")
@@ -210,6 +254,16 @@ class StagedTests(unittest.TestCase):
             [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
             capture_output=True, encoding="utf-8",
         )
+
+    def test_staged_checks_optional_architecture_when_indexed(self):
+        self.config = BASE_RULES
+        self.write("docs/architecture.md", "## 组件\n")
+        untracked = self.check_project("--staged")
+        self.assertEqual(untracked.returncode, 0, untracked.stdout + untracked.stderr)
+        self.git("add", "-f", "docs/architecture.md")
+        tracked = self.check_project("--staged")
+        self.assertEqual(tracked.returncode, 1, tracked.stdout + tracked.stderr)
+        self.assertIn("missing section in docs/architecture.md: ## 数据流", tracked.stdout)
 
     def test_index_wins_over_gitignore_for_tracked_files(self):
         self.write("docs/goal.md", "## Goal\n")

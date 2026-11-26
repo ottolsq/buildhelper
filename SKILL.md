@@ -6,7 +6,17 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 # 项目文档建设与维护
 
-阅读本 skill 的 agent 协助用户约定项目文档和工作方式。维护本 skill 仓库的指令在根 `AGENTS.md`；为下游项目编写指令时，使用 `references/templates/AGENTS.template.md`。下游 `AGENTS.md` 默认入库，由用户按项目维护。默认输出中文，代码、命令、标识符、提交信息用英文。
+阅读本 skill 的 agent 协助用户约定项目文档和工作方式。默认输出中文，代码、命令、标识符、提交信息用英文。
+
+先确定两个目录。**Skill 根目录**是本文件所在的目录，根 `README.md` 介绍 buildhelper，根 `AGENTS.md` 供维护 buildhelper 的 agent 使用。**目标项目根目录**由本次任务确定，即使 skill 安装在该项目的子目录中，项目文档也写到目标项目。
+
+| 从 skill 读取 | 在目标项目中编写 |
+|---|---|
+| `references/templates/README.md` | 根 `README.md`，给项目使用者阅读 |
+| `references/templates/AGENTS.template.md` | 根 `AGENTS.md`，给接手项目的 agent 阅读，默认入库，由用户按项目调整 |
+| `references/templates/` 中的目标、计划、架构等模板 | 按阶段写入目标项目 `docs/`，只发布已确认且可共享的内容 |
+
+buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内的 `SKILL.md`、`references/` 和 `scripts/` 即可开展工作。
 
 ## 何时用
 
@@ -31,7 +41,8 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 | 触发 | 必产出 | 可延后 |
 |---|---|---|
-| 立项 | `README.md` 骨架、`docs/goal.md`、`docs/architecture.md` 初稿、`AGENTS.md` | `CHANGELOG`、ADR |
+| 立项 | 项目 `README.md`、`AGENTS.md`、`docs/goal.md`。在目标文档中记下最终使用效果和粗略阶段路线 | 架构文档、ADR、详细排期 |
+| 首次确定关键设计，或接入已有项目时查明模块边界 | 在 `docs/architecture.md` 记下已确认的边界、依据和选择理由。旧决定的原因无法查证时写「原因未确认」 | 需要单独追溯的取舍再写 ADR |
 | 里程碑开始 | `docs/plan.md` 的本期目标与 DoD | — |
 | 里程碑结束 | `docs/history/NN-<名字>.md`、`plan.md` 状态更新 | 独立测试记录 |
 | 发版 | `CHANGELOG.md`、README 的安装与运行节 | — |
@@ -57,8 +68,8 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 2. **盘点** — 列出「已有 / 缺失 / 过期」三列，不要边盘点边写。
 3. **询问** — 从现有资料确认目标用户、最终期待的使用效果和本期验收条件。只就影响当前决定的缺口逐项询问。
 4. **生成** — 只写缺失项；从 `references/templates/` 复制，替换掉所有 `<!-- fill -->`。
-5. **交叉校验** — README 的命令 = 清单文件里的脚本名；plan 的里程碑 = CHANGELOG 的版本号；`AGENTS.md` 的命令真实存在；`goal.md` 的非目标与 plan 的任务不冲突。
-6. **自检** — 新建或调整文档骨架、阶段交付或审计时，运行 `python scripts/check_docs.py -root <项目根> -stage <当前阶段>`；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。文档入库时可加 `--staged` 辅助检查。它按索引选文件、读取工作区文本，最终用 `git diff --cached` 审阅实际暂存的内容。日常纯代码改动若未改变文档所述行为、命令或约定，运行对应代码测试即可。
+5. **交叉校验** — 核对当前已有的文档。README 和 `AGENTS.md` 里的可运行命令须有实际入口；有计划后核对范围，发版时再核对变更记录。
+6. **自检** — 新建或调整文档骨架、阶段交付或审计时，使用 skill 安装目录中的校验器，以目标项目为 `-root`（见「校验」）；退出码 `1` 表示有 FAIL，先修；`2` 表示用法或配置错误（不是文档问题）。文档入库时可加 `--staged` 辅助检查。它按索引选文件、读取工作区文本，最终用 `git diff --cached` 审阅实际暂存的内容。日常纯代码改动若未改变文档所述行为、命令或约定，运行对应代码测试即可。
 7. **报告** — 新增、修改、跳过分别列清；跳过必须给理由。
 
 ## 一份文档只有一个家
@@ -108,9 +119,9 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 | 文件 | 必须有什么 |
 |---|---|
-| `README.md` | 一句话目标、状态、跑起来的命令、文档索引 |
-| `docs/goal.md` | 问题、用户、目标、非目标、成功标准 |
-| `docs/architecture.md` | 组件边界、数据流、外部依赖、ADR 索引、已知边界 |
+| `README.md` | 适用人群、用途、已有与待验证的能力。从干净环境到首个可观察结果的步骤，或明确当前尚无可运行入口。只链接已经存在且可共享的文档 |
+| `docs/goal.md` | 问题、用户、最终使用效果、非目标、成功标准和粗略阶段路线 |
+| `docs/architecture.md`（按需） | 写实际组件边界、数据流和已确认的设计理由。已有 ADR 时再加索引 |
 | `docs/adr/NNN-*.md` | 背景、决策、备选、后果 |
 | `docs/plan.md` | 本期目标、粗粒度任务、DoD、风险、验收方式 |
 | `docs/history/NN-*.md` | 达成情况、未完成及原因、风险、下阶段 |
@@ -139,11 +150,11 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 `scripts/check_docs.py` 检查必填文件、必填章节、长度超限、相对链接、**发布边界**（已发布文件不得链接被 `.gitignore` 忽略的路径）、**重复归属**（`*_api.md` 之类不在唯一位置）、**文档预算**（`docs/` 下的文件数）、ADR 编号、残留占位符、**疑似凭据**。只用 Python 3.8+ 标准库，Windows / macOS / Linux 是同一份脚本。
 
 ```text
-python3 scripts/check_docs.py -root <项目根> -stage founding   # macOS / Linux
-python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
+python3 "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage founding   # macOS / Linux
+python  "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage founding   # Windows
 ```
 
-`-stage` 三档，累计：`founding`（默认，README / goal / architecture / AGENTS）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
+`-stage` 三档，累计：`founding`（默认，按立项所需文件检查）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
 
 三种范围，互斥，选一个：
 
@@ -167,10 +178,12 @@ python  scripts/check_docs.py -root <项目根> -stage founding   # Windows
 
 ### 项目适配
 
-规则不该逼着项目改文档。存量项目用 `-config` 指向一份自己的配置：
+配置中，`files` 条目的 `checkIfPresent: true` 让校验器在文档出现后检查章节和长度。下游架构文档默认采用这条规则。如果项目把同一文件列入某个 `stages` 阶段，从该阶段起按必填处理。发布模式和暂存模式沿用各自的文件范围。
+
+存量项目可用 `-config` 指向自己的配置：
 
 ```text
-python scripts/check_docs.py -root . -config references/checks-stock.json
+python "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -config "<skill 根>/references/checks-stock.json"
 ```
 
 `references/checks-stock.json` 是现成起点：它 `extends` 基础配置，只放宽已有 README 和架构文档的长度上限，其他规则照旧。要更具体的调整，写一份新 JSON 并 `extends` 基础配置——只写差异项，`files` 按文件浅合并，其余键整键覆盖；`extends` 成环以 `2` 退出。
