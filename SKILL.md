@@ -120,7 +120,7 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 - 清单文件：`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml`、`*.csproj`
 - 命令来源：清单里的 `scripts`、`Makefile`、`justfile`、CI 配置
 - 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`
-- 写入边界：核对目标项目的 `.gitignore` 和 Git 已跟踪文件。若既有规则会排除原本要共享的文档，说明影响，请用户取舍。
+- 写入前核对目标项目的 `.gitignore` 和 Git 已跟踪文件。buildhelper 的忽略清单仅供维护本仓库使用。下游沿用自己的规则，不复制该清单。若 skill 仅供项目本地使用，只忽略它的具体安装目录。若既有规则会排除原本要共享的文档，说明影响，请用户取舍。
 - 事实来源：所有命令从上述文件抄，不凭印象写；查不到就标「未验证」
 
 ## 每份文档的最低要求
