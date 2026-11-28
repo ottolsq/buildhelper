@@ -88,7 +88,12 @@ def read_text(path):
 
 
 def load_config_file(config_path, seen=None):
-    """Read a config, merging ``extends`` so a project can override only what differs."""
+    """Read a config, merging ``extends`` so a project can override only what differs.
+
+    ``files`` entries merge per file and ``stages`` per stage, so a project can
+    replace one required file without repeating the rest of the stage list.
+    Other keys replace the inherited value.
+    """
     path = Path(config_path).resolve()
     seen = set(seen or ())
     if path in seen:
@@ -106,7 +111,9 @@ def load_config_file(config_path, seen=None):
         return settings
     base_path = (path.parent / base).resolve()
     if not base_path.is_file():
-        raise ConfigError("config extends missing file: {0} (from {1})".format(base_path, path))
+        raise ConfigError(
+            "config extends missing file: {0} (from {1}); extends paths resolve from the config file's own directory".format(
+                base_path, path))
     parent = load_config_file(base_path, seen)
     merged = dict(parent)
     for key, value in settings.items():
@@ -119,6 +126,11 @@ def load_config_file(config_path, seen=None):
         base_files[name] = combined
     if "files" in settings:
         merged["files"] = base_files
+    base_stages = dict(parent.get("stages") or {})
+    for stage, required in (settings.get("stages") or {}).items():
+        base_stages[stage] = required
+    if "stages" in settings:
+        merged["stages"] = base_stages
     return merged
 
 
@@ -344,7 +356,15 @@ def markdown_headings(text):
     return headings
 
 
-def check_required(root, files, names, report):
+def existing_alternatives(root, name, settings):
+    """Documents already on disk that may stand in for a missing default file."""
+    mapping = settings.get("alternatives") or {}
+    if not isinstance(mapping, dict):
+        return []
+    return [item for item in mapping.get(name) or [] if (root / item).is_file()]
+
+
+def check_required(root, files, names, settings, report):
     if not names:
         report.warn("no files required by this stage")
         return
@@ -353,6 +373,10 @@ def check_required(root, files, names, report):
         path = root / name
         if not path.is_file():
             report.fail("missing file: " + name)
+            found = existing_alternatives(root, name, settings)
+            if found:
+                print("note  {0} is missing; existing {1} may already cover it (reuse it via -config instead of creating a second document)".format(
+                    name, ", ".join(found)))
             continue
         text = read_text(path)
         sections = rule.get("sections") or []
@@ -524,7 +548,28 @@ def check_secrets(root, files, rules, allow_re, strict, report):
     print("note  secret scan: patterns only; git history and untracked files are not scanned; not exhaustive")
 
 
-def classify_document(relative_path, core_names, scopes):
+def alternative_roles(root, settings):
+    """Map an existing stand-in document to the role of the default it may cover.
+
+    Only used when the default file is absent: a project may keep its milestone
+    plan in ``ROADMAP.md`` instead of ``docs/plan.md`` and should see that file
+    classified as ``keep`` rather than ``review``.
+    """
+    roles = {}
+    mapping = settings.get("alternatives") or {}
+    if not isinstance(mapping, dict):
+        return roles
+    for name, candidates in mapping.items():
+        if (root / name).is_file():
+            continue
+        role = CORE_ROLES.get(name, "core")
+        for candidate in candidates or []:
+            if (root / candidate).is_file():
+                roles[candidate] = role
+    return roles
+
+
+def classify_document(relative_path, core_names, scopes, stand_in_roles=None):
     """Guess a document's role and the action that would consolidate it.
 
     The answer is a proposal for a human to confirm, never something the
@@ -534,6 +579,8 @@ def classify_document(relative_path, core_names, scopes):
     parts = relative_path.split("/")[:-1]
     if relative_path in core_names or relative_path in CORE_ROLES:
         return "keep", CORE_ROLES.get(relative_path, "core"), ""
+    if stand_in_roles and relative_path in stand_in_roles:
+        return "keep", stand_in_roles[relative_path], ""
     if "adr" in parts:
         return "keep", "decision", ""
     if "history" in parts or "postmortems" in parts:
@@ -573,10 +620,11 @@ def inventory_report(root, markdown, settings, files, index):
     """Print one row per document: what it is, and what would consolidate it."""
     core_names = set(files)
     scopes = settings.get("scopes") or {}
+    stand_in_roles = alternative_roles(root, settings)
     rows = []
     for path in markdown:
         rel = relative(path, root)
-        action, role, target = classify_document(rel, core_names, scopes)
+        action, role, target = classify_document(rel, core_names, scopes, stand_in_roles)
         if index is None:
             source = "?"
         else:
@@ -723,7 +771,7 @@ def run(args):
     report = Report()
     if args.inventory:
         inventory_report(root, markdown, settings, files, inventory_index)
-    check_required(root, files, names, report)
+    check_required(root, files, names, settings, report)
     check_scopes(root, markdown, settings, report)
     check_budget(root, markdown, settings, report)
     check_links(root, markdown, report, unpublished, label, clean_message)

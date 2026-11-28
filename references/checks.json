@@ -14,6 +14,9 @@
     "CHANGELOG.md": { "sections": ["## "], "maxLines": null }
   },
   "budgets": { "docs": 8 },
+  "alternatives": {
+    "docs/plan.md": ["ROADMAP.md", "docs/roadmap.md", "PLAN.md"]
+  },
   "scopes": {
     "api": { "match": ["*_api.md", "api_*.md"], "allow": ["docs/api", "API.md"] },
     "module": { "match": ["*_module.md"], "allow": ["docs/architecture.md", "docs/modules"] }

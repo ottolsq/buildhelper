@@ -46,6 +46,85 @@ class RequiredHeadingTests(unittest.TestCase):
                 self.assertIn("missing section in README.md: ## Required", result.stdout)
 
 
+class AlternativeTests(unittest.TestCase):
+    """A missing default file should name the document that may already cover it."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.config = self.write("checks.json", json.dumps({
+            "stages": {"founding": ["README.md"], "milestone": ["docs/plan.md"]},
+            "files": {
+                "README.md": {"sections": ["# "]},
+                "docs/plan.md": {"sections": ["## Milestone"]},
+            },
+            "alternatives": {"docs/plan.md": ["ROADMAP.md"]},
+        }))
+        self.write("README.md", "# Project\n")
+
+    def write(self, relative_path, text):
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def check_project(self, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "-root", str(self.root), "-config", str(self.config), *args],
+            capture_output=True, encoding="utf-8",
+        )
+
+    def test_missing_default_points_at_an_existing_stand_in(self):
+        self.write("ROADMAP.md", "# Roadmap\n")
+
+        result = self.check_project("-stage", "milestone")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("FAIL  missing file: docs/plan.md", result.stdout)
+        self.assertIn("note  docs/plan.md is missing; existing ROADMAP.md", result.stdout)
+        self.assertIn("reuse it via -config", result.stdout)
+
+    def test_no_hint_without_a_stand_in_or_when_the_default_exists(self):
+        absent = self.check_project("-stage", "milestone")
+        self.assertNotIn("note  docs/plan.md is missing", absent.stdout)
+
+        self.write("ROADMAP.md", "# Roadmap\n")
+        self.write("docs/plan.md", "## Milestone\n")
+        present = self.check_project("-stage", "milestone")
+        self.assertEqual(present.returncode, 0, present.stdout + present.stderr)
+        self.assertNotIn("note  docs/plan.md is missing", present.stdout)
+
+    def test_inventory_keeps_the_stand_in_as_the_plan_home(self):
+        self.write("ROADMAP.md", "# Roadmap\n")
+
+        result = self.check_project("--inventory")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        rows = [line for line in result.stdout.splitlines() if re.match(r"^  keep\s+ROADMAP\.md\s+plan\b", line)]
+        self.assertEqual(len(rows), 1, result.stdout)
+
+
+class StockConfigTests(unittest.TestCase):
+    def test_stock_config_is_used_in_place_with_its_own_extends(self):
+        stock = SCRIPT.resolve().parents[1] / "references" / "checks-stock.json"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text("# Project\n" + "line\n" * 60, encoding="utf-8")
+            (root / "docs").mkdir()
+            (root / "docs" / "goal.md").write_text("## 目标\n\n## 非目标\n\n## 成功标准\n", encoding="utf-8")
+            (root / "AGENTS.md").write_text("## 命令\n\n## 禁止事项\n\n## 完成定义\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(stock)],
+                capture_output=True, encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("checks-stock.json", result.stdout)
+            self.assertNotIn("WARN  length", result.stdout)
+
+
 class PublishedBoundaryTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
@@ -579,6 +658,47 @@ class ConfigExtendsTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
             self.assertIn("error: config extends loop", result.stderr)
+
+    def test_child_can_replace_one_stage_without_repeating_the_rest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "base.json").write_text(json.dumps({
+                "stages": {
+                    "founding": ["README.md"],
+                    "milestone": ["docs/plan.md"],
+                    "release": ["CHANGELOG.md"],
+                },
+                "files": {"README.md": {"sections": ["# "]}},
+            }), encoding="utf-8")
+            child = root / "child.json"
+            child.write_text(json.dumps({
+                "extends": "base.json",
+                "stages": {"milestone": ["ROADMAP.md"]},
+                "files": {"ROADMAP.md": {"sections": ["## Milestone"]}},
+            }), encoding="utf-8")
+            (root / "README.md").write_text("# Project\n", encoding="utf-8")
+            (root / "ROADMAP.md").write_text("## Milestone\n", encoding="utf-8")
+            (root / "CHANGELOG.md").write_text("## 0.1.0\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(child), "-stage", "release"],
+                capture_output=True, encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("missing file: docs/plan.md", result.stdout)
+            self.assertIn("ok    sections: ROADMAP.md", result.stdout)
+
+    def test_extends_error_names_the_resolution_rule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "child.json").write_text(json.dumps({"extends": "missing.json"}), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "-root", str(root), "-config", str(root / "child.json")],
+                capture_output=True, encoding="utf-8",
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("resolve from the config file's own directory", result.stderr)
 
 
 if __name__ == "__main__":
