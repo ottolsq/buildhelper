@@ -33,7 +33,7 @@ scripts/                     check_docs.py validator and its tests (Python 3.8+,
 - Published surface, as a fresh clone sees it: `python scripts/check_docs.py -root . -stage release --published`
 - Local doc set including `docs/`: `python scripts/check_docs.py -root . -stage founding`
 - What a commit would contain: add `--staged`; make placeholders and secrets fail: add `--strict`
-- Existing projects: `-config references/checks-stock.json` relaxes page-length limits only
+- Existing projects: use `-config <skill>/references/checks-stock.json` directly — no copy, since `extends` resolves from the config's own directory; project rules go in a separate config that extends it
 - One home per document: `--inventory` lists every file with a role and a keep/merge/archive proposal; `scopes` and the `docs/` budget live in `references/checks.json`
 - Stages accumulate (`founding`, `milestone`, `release`); exit `0` pass, `1` findings, `2` usage error. Without Python, use `references/checklist.md`.
 

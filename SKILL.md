@@ -8,7 +8,7 @@ whenToUse: 新项目立项、里程碑开始或结束、发版、复盘，或被
 
 阅读本 skill 的 agent 协助用户约定项目文档和工作方式。默认输出中文，代码、命令、标识符、提交信息用英文。
 
-先确定两个目录。**Skill 根目录**是本文件所在的目录，根 `README.md` 介绍 buildhelper，根 `AGENTS.md` 供维护 buildhelper 的 agent 使用。**目标项目根目录**由本次任务确定，即使 skill 安装在该项目的子目录中，项目文档也写到目标项目。
+先确定两个目录。**Skill 根目录**是本文件所在的目录（buildhelper 仓库根）；其中的根 `README.md` 介绍 buildhelper，根 `AGENTS.md` 供维护 buildhelper 的 agent 使用，都不是目标项目的文档。**目标项目根目录**由本次任务确定，即使 skill 安装在该项目的子目录中，项目文档也写到目标项目。
 
 | 从 skill 读取 | 在目标项目中编写 |
 |---|---|
@@ -33,8 +33,8 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 
 ## 三条硬规则
 
-1. **只补缺，不重写。** 已存在的文件一律先读；已有段落只做校准。项目约定与模板不同时，先指出具体差异、对实际工作的影响，让用户取舍，保留用户已有的修改；结构性改动先给出 diff 摘要并等确认。唯一例外是用户明确要求的「存量整理」（见下节）。
-2. **写盘白名单。** 只允许写 `README.md`、`CHANGELOG.md`、`AGENTS.md`、`docs/**`。不碰源码、CI 配置、`.git`、依赖清单。
+1. **只补缺，不重写。** 已存在的文件一律先读；已有段落只做校准。项目约定与模板不同时，先指出具体差异、对实际工作的影响，让用户取舍，保留用户已有的修改；结构性改动先给出 diff 摘要并等确认。项目已有本期计划（如根 `ROADMAP.md` 写到本期目标与验收条件）时，以它为本期计划的家，在原处补缺，不另建 `docs/plan.md`。唯一例外是用户明确要求的「存量整理」（见下节）。
+2. **写盘白名单。** 只允许写 `README.md`、`CHANGELOG.md`、`AGENTS.md`、`docs/**`。不碰源码、CI 配置、`.git`、依赖清单。项目已有的计划/路线图在白名单外且确实要补缺时，先说明改哪几条并请用户授权一次，不复制成第二份计划。
 3. **信息不足就问，不编。** 目标、用户、完成标准探测不出来时，从尚不清楚且会影响当前工作的事项中选一个询问用户；不允许生成占位式假目标然后把流程走完。
 
 ## 阶段门与产出
@@ -43,12 +43,14 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 |---|---|---|
 | 立项 | 项目 `README.md`、`AGENTS.md`、`docs/goal.md`。在目标文档中记下最终使用效果和粗略阶段路线 | 架构文档、ADR、详细排期 |
 | 首次确定关键设计，或接入已有项目时查明模块边界 | 在 `docs/architecture.md` 记下已确认的边界、依据和选择理由。旧决定的原因无法查证时写「原因未确认」 | 需要单独追溯的取舍再写 ADR |
-| 里程碑开始 | `docs/plan.md` 的本期目标与 DoD | — |
-| 里程碑结束 | `docs/history/NN-<名字>.md`、`plan.md` 状态更新 | 独立测试记录 |
+| 里程碑开始 | 已有计划或路线图的本期目标与 DoD；都没有才建 `docs/plan.md` | — |
+| 里程碑结束 | `docs/history/NN-<名字>.md`、计划文档状态更新（`plan.md` 或已有路线图） | 独立测试记录 |
 | 发版 | `CHANGELOG.md`、README 的安装与运行节 | — |
 | 复盘 / 事故 | `docs/postmortems/YYYY-MM-DD-<标题>.md`，并提炼出一条规则 | — |
 
 阶段门之外不主动生成文档。用户没有说要发版，就不要写 CHANGELOG。
+
+里程碑结案前至少要有一次覆盖 DoD 的实际复验；没有证据就写「已实现，待实际验证」，不勾完成、不写结案结论。agent 自测不等于用户验收（2026-11-28 下游试跑）。
 
 **调研到何时结束。** 先读现有入口、用户材料和约束，只查会改变本期选择的未知项。能用证据说明谁遇到什么问题、已有办法哪里不够、还有哪些假设待验证，就可以提出本期方向。若缺口会改变范围或关键选型，说明备选方案的利弊、推荐理由和未验证之处，让用户决定，或提议一个最小实验。其余未知记下何时需要再查。局部修正只需说明复现条件和影响面。
 
@@ -61,7 +63,7 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 | 场景 | 起手动作 | 产物 |
 |---|---|---|
 | 开工（bootstrap） | 探测项目类型 + 盘点已有文档 | 缺失的核心文档骨架 |
-| 中期（maintain） | 读 `docs/plan.md` 的当前里程碑 | 只补缺、只校准 |
+| 中期（maintain） | 先找本期计划的家：`docs/plan.md`、根 `ROADMAP.md` 等 | 只补缺、只校准 |
 | 收尾 / 整理（consolidate） | 先跑 `--inventory`，出清单等确认 | 合并、归档、删除后的收敛结果 |
 
 判断错了代价很高：中期误当开工＝重复造文档；开工误当整理＝把仅有的几份也清掉。拿不准就直接问用户处在哪一步。
@@ -91,7 +93,7 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 | 版本变化 | `CHANGELOG.md` | 是 |
 | 目标与非目标 | `docs/goal.md` | 已确认、可共享的目标 |
 | 架构、模块边界 | `docs/architecture.md`（模块多才拆 `docs/modules/`） | 已确认、可共享的边界 |
-| 里程碑与 DoD | `docs/plan.md` | 已确认的共享路线与验收条件 |
+| 里程碑与 DoD | `docs/plan.md`；项目已有路线图时以它为本期计划的家 | 已确认的共享路线与验收条件 |
 | 决策与理由 | `docs/adr/NNN-*.md` | 已采纳、可共享的决定及理由 |
 | 对外接口契约 | `docs/api/` | 可向仓库读者公开的契约 |
 | 验收与缺陷 | `docs/test-records.md` | 脱敏后的实测结论与复现方法 |
@@ -119,7 +121,8 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 - **是不是一个项目**：根目录有 `README` 或清单文件 → 是项目；根目录没有 `README` 但有子目录自带 `.git` → 是容器工作区，让用户挑一个子项目，不要给容器根写文档；纯笔记、归档、下载目录不接入，除非用户明确要求（2026-11-22 studyAI 实测：容器根上校验只会得到 4 个无意义的 FAIL）
 - 清单文件：`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml`、`*.csproj`
 - 命令来源：清单里的 `scripts`、`Makefile`、`justfile`、CI 配置
-- 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`
+- 已有文档：`README*`、`docs/**`、`CHANGELOG*`、`AGENTS.md`、`CLAUDE.md`、`ROADMAP*`
+- 项目配置：`docs/checks.json`、根 `checks*.json`；有就先读，校验时用 `-config` 指它，不要拿默认规则套存量项目。根目录若有一份从 skill 复制的 `checks-stock.json`，提醒用户改用 skill 安装目录里的那份并清掉复制件，删除需授权（2026-11-28 下游试跑）
 - 写入前核对目标项目的 `.gitignore` 和 Git 已跟踪文件。buildhelper 的忽略清单仅供维护本仓库使用。下游沿用自己的规则，不复制该清单。若 skill 仅供项目本地使用，只忽略它的具体安装目录。若既有规则会排除原本要共享的文档，说明影响，请用户取舍。
 - 事实来源：所有命令从上述文件抄，不凭印象写；查不到就标「未验证」
 
@@ -150,6 +153,7 @@ buildhelper 自己的 `docs/` 是本地维护记录。使用者从安装包内�
 - 把「整理」做成「旧文档原样搬进 `docs/history/`」：归档不是去处，结论必须有新的落点，引用也要跟着改
 - 只按 README 索引盘点存量文档：没被索引的文件永远处理不到，而它们往往最该处理
 - 同一件事开第二份文档：先查「一份文档只有一个家」，有归属就合并进去
+- 项目已有路线图或计划仍另建 `docs/plan.md`：已有计划覆盖本期就补原处，没有才建
 - 把 `*_api.md`、`*_module.md` 平铺在模块目录里：这是同一文档的副本，校验会报 `duplicate scope`
 - 整理只搬运不收敛：`docs/` 超出 `budgets` 说明还在堆积，搬进 `docs/history/` 不等于处理
 
@@ -162,7 +166,9 @@ python3 "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage fou
 python  "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage founding   # Windows
 ```
 
-`-stage` 三档，累计：`founding`（默认，按立项所需文件检查）、`milestone`（加 `docs/plan.md`）、`release`（加 `CHANGELOG.md`）。不确定就先用默认值：直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
+项目已有文档时，改用 `-config "<skill 根>/references/checks-stock.json"` 跑：它只放宽已有文档的长度上限，不需要复制进项目（见「项目适配」）。
+
+`-stage` 三档，累计：`founding`（默认，按立项所需文件检查）、`milestone`（加里程碑计划，默认 `docs/plan.md`，项目可配置成已有路线图）、`release`（加 `CHANGELOG.md`）。先从已有文档判断阶段：本期计划已存在就用 `milestone`，要发版才上 `release`；拿不准才用默认的 `founding`。直接上 `release` 会给立项阶段的正常缺项刷 FAIL。
 
 三种范围，互斥，选一个：
 
@@ -172,9 +178,11 @@ python  "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage fou
 | `--published` | 只校验会随仓库发布的文件，被忽略的从必填清单剔除 | CI、验收克隆下来的仓库 |
 | `--staged` | git 索引：这次提交真正会包含的文件 | 提交前、pre-commit |
 
-`--staged` 读的是索引而不是 `.gitignore`，所以「已跟踪但被忽略」的文件照常校验；未跟踪的文档会报 `skip untracked`，工作区与索引内容不同会报 `note worktree differs`（校验的仍是工作区内容）。它不是仓库或无 git 时以 `2` 退出并说明原因。
+`--staged` 读的是索引而不是 `.gitignore`，所以「已跟踪但被忽略」的文件照常校验；未跟踪的文档会报 `skip untracked`，工作区与索引内容不同会报 `note worktree differs`（校验的仍是工作区内容）。它不是仓库或无 git 时以 `2` 退出并说明原因。项目根只是外层仓库的子目录时，先 `git rev-parse --show-toplevel` 确认仓库根：索引属于外层仓库，`--staged` 的结论不一定等于本项目单独入库的范围（2026-11-28 下游试跑）。
 
 `--inventory` 是只读报告：为每份文档标出角色（`entry` / `goal` / `architecture` / `api` / `process` …）、行数、是否入库，以及处置建议 `keep` / `merge` / `archive` / `review` 和目标位置。落在某个归属目录里的文档（例如 `docs/api/`、`docs/modules/`、根 `API.md`）直接算 `keep`，不看文件名是否匹配通配符；`merge` 的目标是该归属的第一个允许位置。它不移动、不删除任何文件。整理场景先跑它，把表格交给用户确认，再按批准的范围动手。
+
+缺默认文件时，校验器会查 `references/checks.json` 的 `alternatives`：项目里已有等价文档（例如根 `ROADMAP.md` 之于 `docs/plan.md`）就多打一行 `note` 指出它，`--inventory` 也会把这份替代文档按 `plan` 判为 `keep`。先读它、确认是否覆盖本期计划，再决定补缺位置，不要因为缺默认文件就新建第二份计划。
 
 凭据扫描是**规则匹配，不是保证**：只匹配常见 Token、云访问密钥、私钥头、带口令的 URL、`password=` 之类的赋值，命中时只输出 `文件:行号` 和规则名，绝不回显原文；`<your-token>`、`xxx`、`example` 这类占位符放行。它不查 Git 历史、不扫被忽略的文件，也不承诺能识别全部秘密——真实凭据不要写进文档，改用环境变量。默认报 WARN，`--strict` 升为 FAIL。
 
@@ -188,18 +196,31 @@ python  "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -stage fou
 
 配置中，`files` 条目的 `checkIfPresent: true` 让校验器在文档出现后检查章节和长度。下游架构文档默认采用这条规则。如果项目把同一文件列入某个 `stages` 阶段，从该阶段起按必填处理。发布模式和暂存模式沿用各自的文件范围。
 
-存量项目可用 `-config` 指向自己的配置：
+存量项目直接指向 skill 自带的配置，**不要把它复制进项目**：
 
 ```text
 python "<skill 根>/scripts/check_docs.py" -root "<目标项目根>" -config "<skill 根>/references/checks-stock.json"
 ```
 
-`references/checks-stock.json` 是现成起点：它 `extends` 基础配置，只放宽已有 README 和架构文档的长度上限，其他规则照旧。要更具体的调整，写一份新 JSON 并 `extends` 基础配置——只写差异项，`files` 按文件浅合并，其余键整键覆盖；`extends` 成环以 `2` 退出。
+`references/checks-stock.json` 只放宽已有 README 和架构文档的长度上限，其他规则照旧。它 `extends` 同目录的 `checks.json`；`extends` 按**配置文件所在目录**解析，复制单个文件到项目后会找不到基础配置，以 `2` 退出并打印缺失路径。
+
+项目要加自己的规则时，另写一份项目配置并 `extends` 上面那份。相对路径从新配置所在目录算起，例如 skill 装在 `.agents/skills/project-docs`、项目配置放 `docs/checks.json`：
+
+```json
+{
+  "extends": "../.agents/skills/project-docs/references/checks-stock.json",
+  "stages": { "milestone": ["ROADMAP.md"] },
+  "files": { "ROADMAP.md": { "sections": ["## 当前里程碑（M1）", "### 完成定义（DoD）", "### 风险", "### 验收方式"], "maxLines": 120 } }
+}
+```
+
+`files` 按文件、`stages` 按阶段浅合并，其余键整键覆盖，只写差异项即可；`extends` 成环以 `2` 退出。`sections` 按标题原文精确匹配，标题带后缀时要写全（如 `## 当前里程碑（M1）`）。项目把里程碑计划放在根 `ROADMAP.md` 而不是 `docs/plan.md` 时就用这个办法，不要为了过校验复制一份计划。写完先跑一次，核对第一行 `config` 打印的是这份项目配置、`extends` 没有报错。
 
 ## 资源
 
 - `references/templates/` — 9 份模板，按阶段门取用。指令模板使用 `AGENTS.template.md`，防止被误读为当前生效的 `AGENTS.md`
 - `references/checklist.md` — 交付前逐条勾
-- `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限、凭据规则
-- `references/checks-stock.json` — 存量项目起点配置：`extends` 基础规则，只放宽长度
+- `references/checks.json` — 唯一规则源：阶段 → 文件集、必填章节、长度上限、凭据规则、替代文档（`alternatives`）
+- `references/checks-stock.json` — 存量项目起点：用 `-config` 直接指向，只放宽长度；不要复制单文件
 - `scripts/check_docs.py` — 必填文件 / 必填章节 / 相对链接 / ADR 编号 / 占位符 / 发布边界 / 凭据
+- `scripts/test_check_docs.py` — 校验器单元测试，改脚本后运行；需要可写临时目录和 Git

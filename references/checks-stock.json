@@ -1,5 +1,5 @@
 {
-  "_note": "Starting point for adopting an existing project: extends references/checks.json and only relaxes page-length limits, so install and troubleshooting notes that already exist do not have to be cut. Pass it with -config, or copy it into the project and adjust.",
+  "_note": "Starting point for an existing project: pass this file directly with -config from the skill directory; do not copy it alone into the project. extends is resolved relative to this file's own directory, so a copy would not find checks.json. For project-specific rules, write a separate config that extends this file or checks.json, run it once, and confirm the printed config path.",
   "extends": "checks.json",
   "files": {
     "README.md": { "maxLines": 200 },
